@@ -1,0 +1,52 @@
+## Build
+bin/
+obj/
+artifacts/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+## Publish / store
+AppPackages/
+PublishOutputs/
+*.appx
+*.msix
+*.msixbundle
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Test / coverage
+TestResults/
+coverage*/
+*.coverage
+*.coveragexml
+
+## Local secrets / env
+.env
+.env.*
+*.pfx
+*.snk
+
+## Temporary icon build leftovers
+**/macroforge-icon-source.png

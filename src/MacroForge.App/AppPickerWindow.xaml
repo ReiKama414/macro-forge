@@ -1,0 +1,42 @@
+<Window x:Class="MacroForge.App.AppPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="選擇應用程式" Height="540" Width="460"
+        WindowStyle="None"
+        WindowStartupLocation="CenterOwner"
+        Icon="Assets/app.ico"
+        Background="{StaticResource Bg}">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="6"
+                        GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+  </shell:WindowChrome.WindowChrome>
+  <Border BorderBrush="#1E3A2C" BorderThickness="1">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" Background="#071009" BorderBrush="#132A1E" BorderThickness="0,0,0,1" Height="42">
+        <DockPanel LastChildFill="False">
+          <TextBlock DockPanel.Dock="Left" Text="選擇應用程式" VerticalAlignment="Center" Margin="18,0,0,0"
+                     FontWeight="SemiBold" Foreground="{StaticResource Accent}" FontSize="13"/>
+          <Button DockPanel.Dock="Right" Content="✕" Style="{StaticResource ChromeButton}"
+                  shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="Cancel_Click"/>
+        </DockPanel>
+      </Border>
+      <DockPanel Margin="18">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+          <Button Content="使用目前作用中的程式" Style="{StaticResource PrimaryButton}" Click="UseForeground_Click" Margin="0,0,0,8"/>
+          <Button Content="瀏覽 EXE…" Style="{StaticResource GhostButton}" Click="Browse_Click"/>
+        </StackPanel>
+        <ListBox x:Name="AppList" MouseDoubleClick="AppList_MouseDoubleClick">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel>
+                <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding ExecutablePath}" Foreground="{StaticResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </DockPanel>
+  </Border>
+</Window>
