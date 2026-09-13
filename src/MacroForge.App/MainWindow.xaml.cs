@@ -25,6 +25,14 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
         SourceInitialized += OnSourceInitialized;
         PreviewKeyDown += OnPreviewKeyDown;
+        Closing += OnClosing;
+    }
+
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        // Cancel the foreground poller and every running macro so the process
+        // actually exits instead of lingering with background work.
+        _vm.Shutdown();
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -69,6 +77,7 @@ public partial class MainWindow : Window
         var source = PresentationSource.FromVisual(this) as HwndSource;
         if (source is null)
             return;
+        WindowChromeHelper.ApplyRoundedCyberChrome(source.Handle);
         RawInputRegistration.Register(source.Handle);
         source.AddHook(Hook);
     }

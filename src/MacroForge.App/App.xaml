@@ -107,6 +107,44 @@
       <Setter Property="FontSize" Value="15"/>
     </Style>
 
+    <Style x:Key="CyberSwitch" TargetType="ToggleButton">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <StackPanel Orientation="Horizontal">
+              <Border x:Name="track" Width="42" Height="22" CornerRadius="11"
+                      Background="#0A130F" BorderBrush="#245C42" BorderThickness="1">
+                <Ellipse x:Name="knob" Width="14" Height="14" Fill="#4A7A64"
+                         HorizontalAlignment="Left" Margin="3,0,0,0"/>
+              </Border>
+              <ContentPresenter x:Name="label" VerticalAlignment="Center" Margin="10,0,0,0"
+                                TextBlock.Foreground="#7FA894" TextBlock.FontWeight="SemiBold"/>
+            </StackPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="track" Property="BorderBrush" Value="#2CE58B"/>
+                <Setter TargetName="track" Property="Background" Value="#12281C"/>
+                <Setter TargetName="knob" Property="Fill" Value="#2CE58B"/>
+                <Setter TargetName="knob" Property="HorizontalAlignment" Value="Right"/>
+                <Setter TargetName="knob" Property="Margin" Value="0,0,3,0"/>
+                <Setter TargetName="knob" Property="Effect">
+                  <Setter.Value>
+                    <DropShadowEffect Color="#2CE58B" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
+                  </Setter.Value>
+                </Setter>
+                <Setter TargetName="label" Property="TextBlock.Foreground" Value="#2CE58B"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="track" Property="BorderBrush" Value="#2CE58B"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style TargetType="TextBox">
       <Setter Property="Background" Value="{StaticResource InputBg}"/>
       <Setter Property="Foreground" Value="{StaticResource Text}"/>

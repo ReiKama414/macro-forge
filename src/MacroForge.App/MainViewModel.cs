@@ -34,23 +34,68 @@ public sealed class RelayCommand : ICommand
     public void Execute(object? parameter) => _execute(parameter);
 }
 
-public sealed class JobRow
+/// <summary>
+/// Mutable so the automation list can be updated in place. Rebuilding the whole
+/// collection on a timer destroys the buttons mid-click and swallows the click.
+/// </summary>
+public sealed class JobRow : INotifyPropertyChanged
 {
     public string Id { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string ButtonName { get; init; } = "";
-    public string MouseName { get; init; } = "";
-    public string StateText { get; init; } = "";
-    public string ScopeLabel { get; init; } = "";
-    public string IntervalText { get; init; } = "";
-    public string CountText { get; init; } = "";
-    public string NextText { get; init; } = "";
-    public bool IsLive { get; init; }
+
+    private string _name = "";
+    public string Name { get => _name; set => Set(ref _name, value); }
+
+    private string _buttonName = "";
+    public string ButtonName { get => _buttonName; set => Set(ref _buttonName, value); }
+
+    private string _mouseName = "";
+    public string MouseName { get => _mouseName; set => Set(ref _mouseName, value); }
+
+    private string _stateText = "";
+    public string StateText { get => _stateText; set => Set(ref _stateText, value); }
+
+    private string _scopeLabel = "";
+    public string ScopeLabel { get => _scopeLabel; set => Set(ref _scopeLabel, value); }
+
+    private string _intervalText = "";
+    public string IntervalText { get => _intervalText; set => Set(ref _intervalText, value); }
+
+    private string _countText = "";
+    public string CountText { get => _countText; set => Set(ref _countText, value); }
+
+    private string _nextText = "";
+    public string NextText { get => _nextText; set => Set(ref _nextText, value); }
+
+    private bool _isLive;
+    public bool IsLive
+    {
+        get => _isLive;
+        set { if (Set(ref _isLive, value)) OnPropertyChanged(nameof(IsIdle)); }
+    }
     public bool IsIdle => !IsLive;
-    public bool IsPaused { get; init; }
-    public bool CanPause { get; init; }
-    public bool CanResume { get; init; }
-    public bool CanStart { get; init; }
+
+    private bool _canPause;
+    public bool CanPause { get => _canPause; set => Set(ref _canPause, value); }
+
+    private bool _canResume;
+    public bool CanResume { get => _canResume; set => Set(ref _canResume, value); }
+
+    private bool _canStart;
+    public bool CanStart { get => _canStart; set => Set(ref _canStart, value); }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+        field = value;
+        OnPropertyChanged(name);
+        return true;
+    }
+
+    private void OnPropertyChanged(string? name) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 public sealed class MacroStep : INotifyPropertyChanged
@@ -118,6 +163,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IReadOnlyList<string> LeaveOptions { get; } = new[] { "暫停", "停止", "忽略" };
 
     private readonly DispatcherTimer _jobTimer;
+    private volatile bool _jobsDirty = true;
+    private volatile bool _devicesDirty;
+    private bool _shuttingDown;
 
     private ManagedMouse? _selected;
     public ManagedMouse? Selected
@@ -176,6 +224,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string _status = "正在掃描滑鼠…";
     public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
+
+    private bool _armed;
+    /// <summary>
+    /// Master switch, always off at startup so nothing runs until the user says so.
+    /// </summary>
+    public bool Armed
+    {
+        get => _armed;
+        set
+        {
+            if (_armed == value) return;
+            _armed = value;
+            Service.SetTriggersEnabled(value);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ArmLabel));
+            OnPropertyChanged(nameof(ArmHint));
+            _jobsDirty = true;
+        }
+    }
+    public string ArmLabel => Armed ? "已啟用" : "未啟用";
+    public string ArmHint => Armed
+        ? "滑鼠按鍵會觸發巨集"
+        : "滑鼠按鍵不會觸發巨集";
 
     private string _toast = "";
     public string Toast { get => _toast; set { _toast = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasToast)); } }
@@ -247,7 +318,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get
         {
             if (MacroSteps.Count == 0)
-                return "還沒有動作。用下面的按鈕新增「按鍵盤／等待／滑鼠點擊」。";
+                return "尚無動作，請用下方按鈕新增。";
             var i = 1;
             return string.Join("\n", MacroSteps.Select(s => s.Kind switch
             {
@@ -280,7 +351,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
     public bool IsRecordingKey => RecordingStep is not null || _recordingKeyboard;
     private bool _recordingKeyboard;
-    public string RecordBanner => "請按下鍵盤上實際的那一顆。上方數字 1（主鍵盤）與右側數字鍵盤 1 會分開記錄。Esc 取消。";
+    public string RecordBanner => "請按下實際那一顆鍵（主鍵盤與數字鍵盤會分開記錄）· Esc 取消";
 
     public string Limitation => UniversalMouseService.LimitationText;
 
@@ -321,32 +392,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MainViewModel(UniversalMouseService service)
     {
         Service = service;
-        _jobTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-        _jobTimer.Tick += (_, _) => RefreshJobs();
+        _jobTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        _jobTimer.Tick += (_, _) => OnTick();
 
-        service.DevicesChanged += () => Application.Current?.Dispatcher.Invoke(Reload);
-        service.MacrosChanged += () => Application.Current?.Dispatcher.Invoke(RefreshJobs);
-        service.ConnectionChanged += ev => Application.Current?.Dispatcher.Invoke(() =>
+        // Never use blocking Dispatcher.Invoke here: these fire from macro worker
+        // threads and would starve the UI thread (frozen window, lost clicks).
+        service.DevicesChanged += () => Post(() => _devicesDirty = true);
+        service.MacrosChanged += () => _jobsDirty = true;
+        service.ConnectionChanged += ev => Post(() =>
         {
             Toast = ev.Message;
             Status = ev.Message;
-            Reload();
+            _devicesDirty = true;
         });
-        service.NewDeviceFound += prompt => Application.Current?.Dispatcher.Invoke(() =>
+        service.NewDeviceFound += prompt => Post(() =>
         {
             PendingNew = prompt;
             OnPropertyChanged(nameof(PendingNew));
             OnPropertyChanged(nameof(HasPendingNew));
             Toast = $"發現新的滑鼠：{prompt.Physical.DisplayName}";
         });
-        service.LearningUpdated += result => Application.Current?.Dispatcher.Invoke(() =>
+        service.LearningUpdated += result => Post(() =>
         {
             Status = result.Message;
             OnPropertyChanged(nameof(IsLearning));
             OnPropertyChanged(nameof(LearningTitle));
-            Reload();
+            _devicesDirty = true;
         });
-        service.Status += text => Application.Current?.Dispatcher.Invoke(() => Status = text);
+        service.Status += text => Post(() => Status = text);
 
         ShowMouseCommand = new RelayCommand(_ => Page = "mouse");
         ShowAutoCommand = new RelayCommand(_ =>
@@ -470,7 +543,40 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Service.StartRuntime();
         _jobTimer.Start();
         Reload();
-        Status = $"已掃描 {Mice.Count(m => m.IsConnected)} 隻滑鼠 · F12 緊急停止";
+        Status = $"已掃描 {Mice.Count(m => m.IsConnected)} 隻滑鼠 · 目前未啟用 · F12 全部停止";
+    }
+
+    public void Shutdown()
+    {
+        _shuttingDown = true;
+        _jobTimer.Stop();
+        Service.StopRuntime();
+    }
+
+    private void Post(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+            return;
+        dispatcher.BeginInvoke(action, DispatcherPriority.Background);
+    }
+
+    private void OnTick()
+    {
+        if (_shuttingDown)
+            return;
+        if (_devicesDirty)
+        {
+            _devicesDirty = false;
+            _jobsDirty = false;
+            Reload();
+            return;
+        }
+        var hasLive = Jobs.Any(j => j.IsLive);
+        if (!_jobsDirty && !hasLive)
+            return;
+        _jobsDirty = false;
+        RefreshJobs();
     }
 
     public void Reload()
@@ -481,6 +587,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         foreach (var mouse in Service.Mice)
             Mice.Add(mouse);
         Selected = Mice.FirstOrDefault(m => m.DeviceId == selectedId) ?? Service.Selected ?? Mice.FirstOrDefault();
+        // Selected may be the same instance, which short-circuits its setter, so
+        // refresh the button list explicitly (learning adds buttons in place).
+        RefreshButtons();
         if (buttonId is not null)
             SelectedButton = Buttons.FirstOrDefault(b => b.Id == buttonId);
         OnPropertyChanged(nameof(HasPendingNew));
@@ -594,7 +703,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             : StepsToActions();
         if (actions.Count == 0)
         {
-            Status = "還沒有動作。請先按「+ 按鍵盤」錄製，或加上等待，再儲存。";
+            Status = "尚無動作，請先新增一個動作再儲存。";
             return;
         }
 
@@ -635,7 +744,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Service.UpsertBinding(binding);
         RefreshJobs();
         Page = "auto";
-        Status = $"已儲存「{binding.Name}」。在自動化頁面按「開始」。";
+        Status = $"已儲存「{binding.Name}」· 到自動化頁按「開始」";
     }
 
     public void BeginRecord(MacroStep step)
@@ -785,12 +894,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 continue;
             var macro = BindingResolver.ToMacro(binding, Selected.Snapshot.Bindings);
             if (macro.Actions.Count == 0) continue;
-            Service.Macros.Scheduler.Start(binding, macro, binding.Trigger is "once" ? "interval" : binding.Trigger);
+            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger));
         }
         Page = "auto";
         RefreshJobs();
-        Status = "已嘗試開始所有已儲存的巨集";
+        Status = "已開始全部巨集";
     }
+
+    /// <summary>
+    /// Pressing Start in the dashboard has no key to hold, so hold/toggle become
+    /// a repeating run while once/count keep their own semantics.
+    /// </summary>
+    private static string ManualTrigger(string? trigger) => (trigger ?? "").ToLowerInvariant() switch
+    {
+        "once" or "單次執行" => "once",
+        "count" or "固定次數" => "count",
+        _ => "interval"
+    };
 
     private void AddProfileFromForeground()
     {
@@ -821,10 +941,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Status = "這個項目還沒有動作，請回滑鼠頁補上按鍵。";
                 return;
             }
-            var trigger = binding.Trigger is "once" or "hold" or "單次執行" or "按住循環" ? "interval" : binding.Trigger;
-            if (string.IsNullOrWhiteSpace(trigger) || trigger is "toggle" or "切換循環")
-                trigger = "interval";
-            Service.Macros.Scheduler.Start(binding, macro, trigger);
+            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger));
             Page = "auto";
             Status = $"已開始：{binding.Name}";
             RefreshJobs();
@@ -835,8 +952,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RefreshJobs()
     {
-        Jobs.Clear();
         var live = Service.Macros.Scheduler.Snapshots.ToDictionary(s => s.Id, s => s);
+        var order = new List<string>();
+
         foreach (var mouse in Service.Mice)
         {
             foreach (var binding in mouse.Snapshot.Bindings.Bindings)
@@ -847,35 +965,49 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 var next = running?.NextRunAt is DateTimeOffset t
                     ? Math.Max(0, (t - DateTimeOffset.UtcNow).TotalSeconds)
                     : 0;
-                Jobs.Add(new JobRow
+
+                var row = Jobs.FirstOrDefault(j => j.Id == binding.Id);
+                if (row is null)
                 {
-                    Id = binding.Id,
-                    Name = string.IsNullOrWhiteSpace(binding.Name) ? (button?.DisplayName ?? binding.TargetButton) : binding.Name,
-                    ButtonName = button?.DisplayName ?? binding.TargetButton,
-                    MouseName = mouse.DisplayName,
-                    StateText = running is null ? "未開始" : running.State switch
-                    {
-                        "paused" => "已暫停",
-                        "waiting" => "等待中（回程式繼續）",
-                        "running" => "執行中",
-                        _ => "未開始"
-                    },
-                    ScopeLabel = ScopeMatcher.Label(binding.Scope),
-                    IntervalText = $"每隔 {IntervalParser.Format(binding.IntervalMs <= 0 ? 1000 : binding.IntervalMs)}",
-                    CountText = running is null ? "尚未執行" : $"已執行 {running.ExecutionCount} 次",
-                    NextText = running?.State == "running" ? $"下一次 {next:0.0} 秒"
-                        : running?.State == "waiting" ? "回到指定程式後會自動繼續"
-                        : running?.State == "paused" ? "按「繼續」或「開始」"
-                        : "按開始才會執行",
-                    IsLive = running is not null && running.State is "running" or "paused" or "waiting",
-                    IsPaused = running?.State == "paused",
-                    CanPause = running?.State is "running" or "waiting",
-                    CanResume = running?.State == "paused",
-                    CanStart = macro.Actions.Count > 0
-                        && (running is null || running.State is "paused" or "waiting")
-                });
+                    row = new JobRow { Id = binding.Id };
+                    Jobs.Add(row);
+                }
+
+                row.Name = string.IsNullOrWhiteSpace(binding.Name) ? (button?.DisplayName ?? binding.TargetButton) : binding.Name;
+                row.ButtonName = button?.DisplayName ?? binding.TargetButton;
+                row.MouseName = mouse.DisplayName;
+                row.StateText = running is null ? "未開始" : running.State switch
+                {
+                    "paused" => "已暫停",
+                    "waiting" => "等待中",
+                    "running" => "執行中",
+                    _ => "未開始"
+                };
+                row.ScopeLabel = ScopeMatcher.Label(binding.Scope);
+                row.IntervalText = $"每 {IntervalParser.Format(binding.IntervalMs <= 0 ? 1000 : binding.IntervalMs)}";
+                row.CountText = running is null ? "" : $"已執行 {running.ExecutionCount} 次";
+                row.NextText = running?.State switch
+                {
+                    "running" => $"下一次 {next:0.0} 秒",
+                    "waiting" => "回到指定程式後自動繼續",
+                    "paused" => "已手動暫停",
+                    _ => ""
+                };
+                row.IsLive = running is not null && running.State is "running" or "paused" or "waiting";
+                row.CanPause = running?.State is "running" or "waiting";
+                row.CanResume = running?.State == "paused";
+                row.CanStart = macro.Actions.Count > 0
+                    && (running is null || running.State is "paused" or "waiting");
+                order.Add(binding.Id);
             }
         }
+
+        for (var i = Jobs.Count - 1; i >= 0; i--)
+        {
+            if (!order.Contains(Jobs[i].Id))
+                Jobs.RemoveAt(i);
+        }
+
         OnPropertyChanged(nameof(HasJobs));
         OnPropertyChanged(nameof(HasNoJobs));
         OnPropertyChanged(nameof(ProfileText));

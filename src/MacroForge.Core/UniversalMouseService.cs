@@ -68,6 +68,12 @@ public sealed class UniversalMouseService
 
     private CancellationTokenSource? _runtimeCts;
 
+    /// <summary>
+    /// Master switch. While false, physical mouse buttons never trigger macros —
+    /// the app stays inert until the user explicitly arms it.
+    /// </summary>
+    public bool TriggersEnabled { get; private set; }
+
     public UniversalMouseService(DeviceStore? store = null)
     {
         _store = store ?? new DeviceStore();
@@ -75,11 +81,29 @@ public sealed class UniversalMouseService
         Macros.Scheduler.Changed += () => MacrosChanged?.Invoke();
     }
 
+    public void SetTriggersEnabled(bool enabled)
+    {
+        if (TriggersEnabled == enabled)
+            return;
+        TriggersEnabled = enabled;
+        if (!enabled)
+            Macros.Scheduler.StopAll();
+        Status?.Invoke(enabled ? "已啟用：滑鼠按鍵可觸發巨集" : "已停用：滑鼠按鍵不會觸發巨集");
+    }
+
     public void StartRuntime()
     {
         _runtimeCts?.Cancel();
         _runtimeCts = new CancellationTokenSource();
         _ = MonitorForegroundAsync(_runtimeCts.Token);
+    }
+
+    public void StopRuntime()
+    {
+        TriggersEnabled = false;
+        _runtimeCts?.Cancel();
+        _runtimeCts = null;
+        Macros.Scheduler.EmergencyStop();
     }
 
     public void Refresh(bool announceHotPlug = false)
@@ -249,6 +273,9 @@ public sealed class UniversalMouseService
             }
             return;
         }
+
+        if (!TriggersEnabled)
+            return;
 
         if (attributed is null)
             return;
