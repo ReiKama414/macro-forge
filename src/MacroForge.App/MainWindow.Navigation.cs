@@ -11,9 +11,48 @@ namespace MacroForge.App;
 
 public partial class MainWindow
 {
+    private static string? NavId(object sender) => sender switch
+    {
+        FrameworkElement { Uid: { Length: > 0 } uid } => uid,
+        FrameworkElement { Tag: string tag } => tag,
+        _ => null
+    };
+
+    private void OnSelectPage(object sender, RoutedEventArgs e)
+    {
+        var tag = NavId(sender);
+        if (tag is null)
+            return;
+
+        switch (tag)
+        {
+            case "mouse":
+                _vm.Page = "mouse";
+                break;
+            case "auto":
+                _vm.ShowAutoCommand.Execute(null);
+                break;
+            case "log":
+                _vm.OpenLogPage();
+                break;
+            default:
+                return;
+        }
+
+        HighlightPageNav();
+    }
+
+    private void HighlightPageNav()
+    {
+        NavMouse.Tag = _vm.IsMousePage ? "Active" : null;
+        NavAuto.Tag = _vm.IsAutoPage ? "Active" : null;
+        NavLog.Tag = _vm.IsLogPage ? "Active" : null;
+    }
+
     private void OnNavigate(object sender, RoutedEventArgs e)
     {
-        if (sender is not FrameworkElement { Tag: string tag }) return;
+        var tag = NavId(sender);
+        if (tag is null) return;
         if (tag == "count") { _vm.TriggerMode = "固定次數"; return; }
 
         var (title, description) = tag switch
@@ -23,7 +62,7 @@ public partial class MainWindow
             "test" => ("按鍵測試與偵測", "選擇偵測方式後，依序按下滑鼠上的實體按鍵。已辨識的按鍵會出現在中央模型。"),
             "profiles" => ("設定檔", $"{_vm.ProfileText}\n\n設定檔會依前景應用程式自動切換。可為目前前景程式新增設定檔。"),
             "transfer" => ("匯入 / 匯出", "備份或載入目前滑鼠的巨集與設定檔。匯入前會自動備份，並停止正在執行的巨集。"),
-            "settings" => ("外觀設定", "選擇整個介面的主題色。面板、選取、焦點、燈光與視窗邊框會同步更新。"),
+            "settings" => ("設定", "調整外觀主題，以及縮小視窗時是否放到系統匣。"),
             _ => ("使用說明", "01  在「我的滑鼠」選裝置。\n\n02  點中央滑鼠按鍵，右側選擇鍵盤／滑鼠／巨集。\n\n03  新增動作並錄製按鍵。\n\n04  設定觸發與作用範圍後儲存。\n\n05  開啟巨集總開關。\n\nF12：全部停止　Esc：取消錄製")
         };
 
@@ -53,6 +92,32 @@ public partial class MainWindow
                     colors.SetBinding(ComboBox.SelectedItemProperty,
                         new Binding(nameof(MainViewModel.SelectedAccent)) { Mode = BindingMode.TwoWay });
                     block.Children.Add(colors);
+
+                    block.Children.Add(new TextBlock
+                    {
+                        Text = "視窗",
+                        Foreground = (System.Windows.Media.Brush)FindResource("Muted"),
+                        FontSize = 12,
+                        Margin = new Thickness(0, 18, 0, 8)
+                    });
+                    var tray = new CheckBox
+                    {
+                        Content = "縮小到右下角系統匣",
+                        Foreground = (System.Windows.Media.Brush)FindResource("Text"),
+                        IsChecked = _vm.MinimizeToTray
+                    };
+                    tray.Checked += (_, _) => _vm.MinimizeToTray = true;
+                    tray.Unchecked += (_, _) => _vm.MinimizeToTray = false;
+                    block.Children.Add(tray);
+                    block.Children.Add(new TextBlock
+                    {
+                        Text = "關閉後可從系統匣圖示還原視窗。",
+                        Foreground = (System.Windows.Media.Brush)FindResource("Muted"),
+                        FontSize = 12,
+                        Margin = new Thickness(0, 6, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+
                     var index = body.Children.IndexOf(actions);
                     body.Children.Insert(Math.Max(0, index), block);
                 }
@@ -88,9 +153,9 @@ public partial class MainWindow
                 actions.Children.Add(CyberDialog.ActionButton(this, "匯出目前設定", () => ExportBindings(dialog)));
                 actions.Children.Add(CyberDialog.ActionButton(this, "匯入設定檔", () => ImportBindings(dialog)));
             }
-        }, height: tag is "help" or "device" ? 480 : 360);
+        }, height: tag is "help" or "device" or "settings" ? 480 : 360);
 
-        _vm.Page = _vm.Page;
+        HighlightPageNav();
     }
 
     private static readonly JsonSerializerOptions TransferJson = new()

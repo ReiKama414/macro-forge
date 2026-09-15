@@ -259,6 +259,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ? "滑鼠按鍵會觸發巨集"
         : "滑鼠按鍵不會觸發巨集";
 
+    private AppSettings _settings = new();
     private string _selectedAccent = "綠";
     public string SelectedAccent
     {
@@ -270,6 +271,33 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             ApplyAccent(value);
             OnPropertyChanged();
         }
+    }
+
+    public bool MinimizeToTray
+    {
+        get => _settings.MinimizeToTray;
+        set
+        {
+            if (_settings.MinimizeToTray == value) return;
+            _settings.MinimizeToTray = value;
+            _settings.MinimizeToTrayPromptSeen = true;
+            if (_persistTheme)
+                _settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
+    public bool MinimizeToTrayPromptSeen => _settings.MinimizeToTrayPromptSeen;
+
+    public void RememberMinimizeToTrayChoice(bool minimizeToTray, bool dontAskAgain)
+    {
+        _settings.MinimizeToTray = minimizeToTray;
+        if (dontAskAgain)
+            _settings.MinimizeToTrayPromptSeen = true;
+        if (_persistTheme)
+            _settings.Save();
+        OnPropertyChanged(nameof(MinimizeToTray));
+        OnPropertyChanged(nameof(MinimizeToTrayPromptSeen));
     }
 
     private string _toast = "";
@@ -495,7 +523,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         });
         AddVirtualCommand = new RelayCommand(_ => service.AddVirtualButton("未知按鍵"));
         RestoreLayoutCommand = new RelayCommand(_ => service.RestoreDefaultLayout());
-        RedetectCommand = new RelayCommand(_ => service.ResetDetectedButtons());
+        RedetectCommand = new RelayCommand(_ =>
+        {
+            service.Refresh(announceHotPlug: true);
+            Status = $"已重新掃描滑鼠 · {Mice.Count(m => m.IsConnected)} 個已連接";
+        });
         DismissToastCommand = new RelayCommand(_ => Toast = "");
         SaveBindingCommand = new RelayCommand(_ => SaveBinding());
         PickAppCommand = new RelayCommand(_ => PickApp());
@@ -589,8 +621,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _jobTimer.Start();
         Reload();
         Status = $"已掃描 {Mice.Count(m => m.IsConnected)} 隻滑鼠 · 目前未啟用 · F12 全部停止";
-        AppLogService.Instance.Info("系統", "應用程式啟動完成 (MacroForge v0.1.0)");
-        AppLogService.Instance.Version("更新", "目前版本：v0.1.0");
+        AppLogService.Instance.Info("系統", "應用程式啟動完成 (MacroForge v1.0.0)");
+        AppLogService.Instance.Version("更新", "目前版本：v1.0.0");
         foreach (var mouse in Mice.Where(m => m.IsConnected))
         {
             AppLogService.Instance.Info("裝置",
@@ -637,20 +669,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private void LoadAccent()
     {
-        try
-        {
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MacroForge",
-                "accent.txt");
-            if (File.Exists(path))
-                _selectedAccent = File.ReadAllText(path).Trim();
-        }
-        catch
-        {
-            _selectedAccent = "綠";
-        }
+        _settings = AppSettings.Load();
+        _selectedAccent = string.IsNullOrWhiteSpace(_settings.Accent) ? "綠" : _settings.Accent.Trim();
         ApplyAccent(_selectedAccent, save: false);
+        OnPropertyChanged(nameof(MinimizeToTray));
+        OnPropertyChanged(nameof(MinimizeToTrayPromptSeen));
     }
 
     private void ApplyAccent(string name, bool save = true)
@@ -659,18 +682,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             ThemePalette.Apply(resources, name);
 
         if (!save || !_persistTheme) return;
-        try
-        {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MacroForge");
-            Directory.CreateDirectory(dir);
-            File.WriteAllText(Path.Combine(dir, "accent.txt"), name);
-        }
-        catch
-        {
-            // Theme persistence is optional.
-        }
+        _settings.Accent = name;
+        _settings.Save();
     }
 
     public void Reload()

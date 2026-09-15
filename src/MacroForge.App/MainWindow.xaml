@@ -11,6 +11,24 @@
   <BooleanToVisibilityConverter x:Key="BoolToVis"/><local:InverseBoolToVis x:Key="InvVis"/><local:ChoiceConverter x:Key="Choice"/>
   <Style x:Key="CardBorder" TargetType="Border"><Setter Property="Background" Value="{DynamicResource Panel}"/><Setter Property="BorderBrush" Value="{DynamicResource Stroke}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="16,18"/></Style>
   <Style x:Key="SectionTag" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Muted}"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style x:Key="BareTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="4,2"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="FontSize" Value="16"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+  <Style x:Key="BareButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="MinWidth" Value="0"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
  </Window.Resources>
  <Border BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1" CornerRadius="15" Background="{DynamicResource Bg}">
   <Grid>
@@ -21,9 +39,15 @@
       <Path Data="M0,28 L17,0 L30,0 L44,24 L31,46 L22,46 L34,25 L25,10 L21,10 L10,28 L21,28 L26,20 L31,29 L25,38 L5,38 Z" Fill="{DynamicResource Accent}" Width="40" Height="44" Stretch="Uniform"/>
       <StackPanel Margin="15,0,0,0"><TextBlock Text="MacroForge" FontFamily="Segoe UI" FontSize="23" FontWeight="SemiBold"/><TextBlock Text="Control Beyond Limits" FontFamily="Segoe UI" FontSize="11" Foreground="{DynamicResource Muted}"/></StackPanel>
      </StackPanel>
-     <Button DockPanel.Dock="Right" Content="✕" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnClose"/>
-     <Button DockPanel.Dock="Right" Content="□" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnMaximize"/>
-     <Button DockPanel.Dock="Right" Content="—" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnMinimize"/>
+     <Button DockPanel.Dock="Right" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnClose" ToolTip="關閉">
+       <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE8BB;" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+     </Button>
+     <Button DockPanel.Dock="Right" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnMaximize" ToolTip="最大化">
+       <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE922;" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+     </Button>
+     <Button DockPanel.Dock="Right" Style="{StaticResource ChromeButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnMinimize" ToolTip="縮小">
+       <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE921;" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+     </Button>
      <Border DockPanel.Dock="Right" Width="1" Background="{DynamicResource Stroke}" Margin="20,17"/>
      <Button DockPanel.Dock="Right" Width="224" Height="40" Margin="0,0,12,0" Tag="profiles" Click="OnNavigate" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="檢視目前設定檔與應用程式規則">
       <DockPanel Width="190"><TextBlock DockPanel.Dock="Left" FontFamily="Segoe Fluent Icons" Text="&#xE7FC;" FontSize="19" Margin="0,0,12,0"/><TextBlock DockPanel.Dock="Right" Text="⌄"/><TextBlock Text="{Binding ActiveProfileName}" TextTrimming="CharacterEllipsis"/></DockPanel>
@@ -33,12 +57,21 @@
    </Border>
    <Grid Grid.Row="1" Margin="7,0,10,8">
     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/><ColumnDefinition Width="414"/></Grid.ColumnDefinitions>
-    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="248"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="300"/></Grid.RowDefinitions>
     <DockPanel Grid.RowSpan="2" Margin="0,24,5,0">
      <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,160">
-      <RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="test" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE9CE;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="按鍵測試" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="device" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="裝置資訊" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="transfer" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE8B7;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="匯入 / 匯出" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="help" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE897;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="使用說明" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton>
+      <Button Style="{StaticResource NavItem}" Uid="test" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE9CE;" FontSize="20" Width="34"/><TextBlock Text="按鍵測試" FontSize="14"/></StackPanel></Button>
+      <Button Style="{StaticResource NavItem}" Uid="device" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="20" Width="34"/><TextBlock Text="裝置資訊" FontSize="14"/></StackPanel></Button>
+      <Button Style="{StaticResource NavItem}" Uid="transfer" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE8B7;" FontSize="20" Width="34"/><TextBlock Text="匯入 / 匯出" FontSize="14"/></StackPanel></Button>
+      <Button Style="{StaticResource NavItem}" Uid="help" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE897;" FontSize="20" Width="34"/><TextBlock Text="使用說明" FontSize="14"/></StackPanel></Button>
      </StackPanel>
-     <StackPanel><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="home" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE80F;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="首頁" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="mouse" Command="{Binding ShowMouseCommand}" IsChecked="{Binding IsMousePage, Mode=OneWay}"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE962;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="滑鼠巨集" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="auto" Command="{Binding ShowAutoCommand}" IsChecked="{Binding IsAutoPage, Mode=OneWay}"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE916;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="自動化任務" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Command="{Binding ShowLogCommand}" IsChecked="{Binding IsLogPage, Mode=OneWay}"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE9D5;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="日誌" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton><RadioButton Style="{StaticResource NavItem}" GroupName="Navigation" Tag="settings" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE713;" FontSize="20" Width="34" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/><TextBlock Text="設定" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/></StackPanel></RadioButton></StackPanel>
+     <StackPanel>
+      <Button Style="{StaticResource NavItem}" Uid="home" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE80F;" FontSize="20" Width="34"/><TextBlock Text="首頁" FontSize="14"/></StackPanel></Button>
+      <Button x:Name="NavMouse" Style="{StaticResource NavItem}" Uid="mouse" Click="OnSelectPage"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE962;" FontSize="20" Width="34"/><TextBlock Text="滑鼠巨集" FontSize="14"/></StackPanel></Button>
+      <Button x:Name="NavAuto" Style="{StaticResource NavItem}" Uid="auto" Click="OnSelectPage"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE916;" FontSize="20" Width="34"/><TextBlock Text="自動化任務" FontSize="14"/></StackPanel></Button>
+      <Button x:Name="NavLog" Style="{StaticResource NavItem}" Uid="log" Click="OnSelectPage"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE9D5;" FontSize="20" Width="34"/><TextBlock Text="日誌" FontSize="14"/></StackPanel></Button>
+      <Button Style="{StaticResource NavItem}" Uid="settings" Click="OnNavigate"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE713;" FontSize="20" Width="34"/><TextBlock Text="設定" FontSize="14"/></StackPanel></Button>
+     </StackPanel>
     </DockPanel>
     <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="0,0,8,0" Padding="12,16,12,14" Visibility="{Binding ShowDeviceWorkspace, Converter={StaticResource BoolToVis}}">
      <DockPanel>
@@ -47,8 +80,8 @@
                 VerticalAlignment="Center" HorizontalAlignment="Right"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                 Command="{Binding RedetectCommand}" ToolTip="重新掃描已連接的滑鼠">
-          <TextBlock Text="＋" FontSize="20" FontFamily="Segoe UI" HorizontalAlignment="Center" VerticalAlignment="Center"
-                     TextAlignment="Center" Margin="0,-2,0,0"/>
+          <TextBlock Text="↻" FontSize="18" FontFamily="Segoe UI Symbol, Segoe UI" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     TextAlignment="Center" Margin="0,-1,0,0"/>
         </Button>
         <TextBlock Text="我的滑鼠" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
       </DockPanel>
@@ -164,78 +197,52 @@
       <DockPanel>
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
           <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Top">
+            <Button Content="{Binding LogClearLabel}" Style="{StaticResource GhostButton}" Command="{Binding ClearLogsCommand}" Margin="0,0,8,0" Padding="14,8"/>
             <Button Content="重新整理" Style="{StaticResource GhostButton}" Command="{Binding RefreshLogsCommand}" Margin="0,0,8,0" Padding="14,8"/>
             <Button Content="匯出日誌" Style="{StaticResource PrimaryButton}" Command="{Binding ExportLogsCommand}" Padding="16,8"/>
           </StackPanel>
           <StackPanel>
-            <TextBlock FontSize="22" FontWeight="SemiBold">
-              <Run FontFamily="Segoe Fluent Icons" Text="&#xE9D5;" FontSize="20"/>
-              <Run Text="  日誌"/>
-            </TextBlock>
+            <TextBlock Text="日誌" FontSize="22" FontWeight="SemiBold"/>
             <TextBlock Text="查看系統運作記錄、事件、錯誤與版本變更" Foreground="{DynamicResource Muted}" Margin="0,6,0,0"/>
           </StackPanel>
         </DockPanel>
 
-        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterAllLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=all}"/>
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterActionLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=action}"/>
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterErrorLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=error}"/>
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterWarningLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=warning}"/>
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterVersionLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=version}"/>
-          <RadioButton Style="{StaticResource LogFilterChip}" GroupName="LogFilter" Content="{Binding LogFilterSystemLabel}"
-                       IsChecked="{Binding LogFilter, Converter={StaticResource Choice}, ConverterParameter=system}"/>
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+          <Button Style="{StaticResource LogFilterChip}" Content="全部日誌" Command="{Binding SetLogFilterCommand}" CommandParameter="all"/>
+          <Button Style="{StaticResource LogFilterChip}" Content="操作記錄" Command="{Binding SetLogFilterCommand}" CommandParameter="action"/>
+          <Button Style="{StaticResource LogFilterChip}" Content="錯誤" Command="{Binding SetLogFilterCommand}" CommandParameter="error"/>
+          <Button Style="{StaticResource LogFilterChip}" Content="警告" Command="{Binding SetLogFilterCommand}" CommandParameter="warning"/>
+          <Button Style="{StaticResource LogFilterChip}" Content="版本變更" Command="{Binding SetLogFilterCommand}" CommandParameter="version"/>
+          <Button Style="{StaticResource LogFilterChip}" Content="系統" Command="{Binding SetLogFilterCommand}" CommandParameter="system"/>
         </WrapPanel>
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,12" Foreground="{DynamicResource Muted}" FontSize="12"
+                   Text="{Binding LogCountSummary}"/>
 
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
           <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding LogTimeOptions}" SelectedItem="{Binding LogTimeOption}" Width="120" Margin="8,0,0,0"/>
           <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding LogLevelOption}" Width="110"/>
-          <TextBox Text="{Binding LogSearch, UpdateSourceTrigger=PropertyChanged}" MinHeight="36"
-                   VerticalContentAlignment="Center" Tag="search"
-                   ToolTip="搜尋日誌內容（支援關鍵字）"/>
+          <TextBox Text="{Binding LogSearch, UpdateSourceTrigger=LostFocus}" MinHeight="36"
+                   VerticalContentAlignment="Center"
+                   ToolTip="搜尋日誌內容，按 Enter 或離開欄位後套用"/>
         </DockPanel>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
           <TextBlock Text="{Binding LogTotalText}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"/>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="‹" Style="{StaticResource GhostButton}" Command="{Binding LogPrevPageCommand}" Padding="10,4" Margin="0,0,6,0"/>
-            <ItemsControl ItemsSource="{Binding LogPageNumbers}">
-              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Button Content="{Binding}" MinWidth="32" Padding="8,4" Margin="0,0,4,0"
-                          Command="{Binding DataContext.LogGoPageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                          CommandParameter="{Binding}">
-                    <Button.Style>
-                      <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding DataContext.LogPageIndex, RelativeSource={RelativeSource AncestorType=Window}}" Value="{Binding}">
-                            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </Button.Style>
-                  </Button>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <Button Content="›" Style="{StaticResource GhostButton}" Command="{Binding LogNextPageCommand}" Padding="10,4" Margin="6,0,0,0"/>
+            <Button Content="上一頁" Style="{StaticResource GhostButton}" Command="{Binding LogPrevPageCommand}" Padding="10,4" Margin="0,0,8,0"/>
+            <TextBlock Text="{Binding LogPageLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <Button Content="下一頁" Style="{StaticResource GhostButton}" Command="{Binding LogNextPageCommand}" Padding="10,4"/>
           </StackPanel>
         </DockPanel>
 
         <Border Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="8">
           <DockPanel>
-                    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="16,12" Background="{DynamicResource ChromeSurface}">
+            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="16,12" Background="{DynamicResource ChromeSurface}">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="160"/>
+                  <ColumnDefinition Width="70"/>
                   <ColumnDefinition Width="90"/>
-                  <ColumnDefinition Width="100"/>
                   <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="時間" Foreground="{DynamicResource Muted}" FontWeight="SemiBold" Margin="4,0"/>
@@ -244,54 +251,22 @@
                 <TextBlock Grid.Column="3" Text="內容" Foreground="{DynamicResource Muted}" FontWeight="SemiBold" Margin="4,0"/>
               </Grid>
             </Border>
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <ItemsControl ItemsSource="{Binding VisibleLogs}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Border BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="16,14">
+                    <Border BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="16,12">
                       <Grid>
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="160"/>
+                          <ColumnDefinition Width="70"/>
                           <ColumnDefinition Width="90"/>
-                          <ColumnDefinition Width="100"/>
                           <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding TimeText}" VerticalAlignment="Top" Foreground="{DynamicResource Muted}" Margin="4,2,8,2"/>
-                        <Border Grid.Column="1" VerticalAlignment="Top" Margin="4,0">
-                          <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource LogLevelBadge}">
-                              <Style.Triggers>
-                                <DataTrigger Binding="{Binding LevelLabel}" Value="操作">
-                                  <Setter Property="Background" Value="#122C20"/><Setter Property="BorderBrush" Value="#52EF99"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding LevelLabel}" Value="警告">
-                                  <Setter Property="Background" Value="#2A2610"/><Setter Property="BorderBrush" Value="#E8D96A"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding LevelLabel}" Value="錯誤">
-                                  <Setter Property="Background" Value="#2A1212"/><Setter Property="BorderBrush" Value="#FF6B6B"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding LevelLabel}" Value="版本">
-                                  <Setter Property="Background" Value="#1E1630"/><Setter Property="BorderBrush" Value="#B388FF"/>
-                                </DataTrigger>
-                              </Style.Triggers>
-                            </Style>
-                          </Border.Style>
-                          <TextBlock Text="{Binding LevelLabel}" FontSize="12">
-                            <TextBlock.Style>
-                              <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#7EB6E8"/>
-                                <Style.Triggers>
-                                  <DataTrigger Binding="{Binding LevelLabel}" Value="操作"><Setter Property="Foreground" Value="#52EF99"/></DataTrigger>
-                                  <DataTrigger Binding="{Binding LevelLabel}" Value="警告"><Setter Property="Foreground" Value="#E8D96A"/></DataTrigger>
-                                  <DataTrigger Binding="{Binding LevelLabel}" Value="錯誤"><Setter Property="Foreground" Value="#FF6B6B"/></DataTrigger>
-                                  <DataTrigger Binding="{Binding LevelLabel}" Value="版本"><Setter Property="Foreground" Value="#B388FF"/></DataTrigger>
-                                </Style.Triggers>
-                              </Style>
-                            </TextBlock.Style>
-                          </TextBlock>
-                        </Border>
-                        <TextBlock Grid.Column="2" Text="{Binding Category}" VerticalAlignment="Top" Margin="4,2"/>
-                        <TextBlock Grid.Column="3" Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Top" Margin="4,2,8,2"/>
+                        <TextBlock Text="{Binding TimeText}" Foreground="{DynamicResource Muted}" Margin="4,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding LevelLabel}" Margin="4,0"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Category}" Margin="4,0"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Message}" TextWrapping="Wrap" Margin="4,0,8,0"/>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -306,7 +281,15 @@
     <Grid Grid.Column="3" Grid.RowSpan="2" Visibility="{Binding ShowDeviceWorkspace, Converter={StaticResource BoolToVis}}"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="186"/></Grid.RowDefinitions>
      <Border Style="{StaticResource CardBorder}" Padding="16,18,14,14">
       <DockPanel>
-       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14"><Button DockPanel.Dock="Right" Content="儲存" Command="{Binding SaveBindingCommand}" Style="{StaticResource PrimaryButton}" Height="32" Padding="16,4"/><TextBlock Text="按鍵設定" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+         <Button DockPanel.Dock="Right" Command="{Binding SaveBindingCommand}" Style="{StaticResource PrimaryButton}"
+                 Width="72" Height="32" Padding="0"
+                 VerticalAlignment="Center"
+                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+           <TextBlock Text="儲存" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="0,-1,0,0"/>
+         </Button>
+         <TextBlock Text="按鍵設定" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+       </DockPanel>
        <TextBlock Text="選取滑鼠上的按鍵，開始設定。" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Visibility="{Binding HasSelectedButton, Converter={StaticResource InvVis}}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12"/>
        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0" Visibility="{Binding HasSelectedButton, Converter={StaticResource BoolToVis}}">
         <StackPanel Margin="0,0,4,8">
@@ -353,30 +336,94 @@
     </Grid>
     <Border Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,8,8,0" Padding="0" Visibility="{Binding IsMousePage, Converter={StaticResource BoolToVis}}">
      <DockPanel>
-      <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="18,10" Height="56"><DockPanel><Button DockPanel.Dock="Right" Content="▷  測試" Command="{Binding TestSelectedCommand}" Width="100" Margin="12,0,0,0"/><TextBlock Text="巨集序列  ·  " FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/><TextBox Text="{Binding BindingName, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Background="Transparent" Width="230" Height="34" VerticalAlignment="Center" Padding="10,6" VerticalContentAlignment="Center" HorizontalAlignment="Left" ToolTip="編輯巨集名稱"/></DockPanel></Border>
-      <UniformGrid DockPanel.Dock="Bottom" Columns="3" Margin="20,8,20,16"><Button Content="＋  鍵盤動作" Command="{Binding AddKeyStepCommand}" Margin="0,0,8,0"/><Button Content="＋  等待時間" Command="{Binding AddWaitStepCommand}" Margin="0,0,8,0"/><Button Content="＋  滑鼠動作" Command="{Binding AddClickStepCommand}"/></UniformGrid>
-      <Border DockPanel.Dock="Top" Background="{DynamicResource AccentSurface}" Padding="14,10" Visibility="{Binding IsRecordingKey, Converter={StaticResource BoolToVis}}"><TextBlock Text="{Binding RecordBanner}" Foreground="{DynamicResource Accent}" TextWrapping="Wrap"/></Border>
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="20,14,14,8">
-       <ItemsControl ItemsSource="{Binding MacroSteps}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal">
-         <Border Width="112" Height="104" CornerRadius="8" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1" ClipToBounds="True"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{DynamicResource InputBg}"/><Style.Triggers><DataTrigger Binding="{Binding IsKey}" Value="True"><Setter Property="Background" Value="#441721"/><Setter Property="BorderBrush" Value="#743141"/></DataTrigger></Style.Triggers></Style></Border.Style>
-          <Grid><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="36"/></Grid.RowDefinitions>
-           <Button Content="{Binding KeyCap}" FontSize="26" FontFamily="Segoe UI Symbol, Segoe UI" Background="Transparent" BorderThickness="0" Padding="8,6" Margin="6,8,6,4" Command="{Binding DataContext.RecordKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Visibility="{Binding IsKey, Converter={StaticResource BoolToVis}}" ToolTip="{Binding KeyLabel}"/>
-           <StackPanel VerticalAlignment="Center" Margin="10,8,10,4" Visibility="{Binding IsWait, Converter={StaticResource BoolToVis}}">
-             <TextBlock Text="◷" FontSize="18" HorizontalAlignment="Center" Margin="0,0,0,2"/>
-             <TextBlock Text="ms" FontSize="10" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" Margin="0,0,0,2"/>
-             <TextBox Text="{Binding Value, UpdateSourceTrigger=LostFocus}" FontSize="15" Padding="8,4" Margin="2,0" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip="等待時間（毫秒）"/>
-           </StackPanel>
-           <ComboBox ItemsSource="{x:Static local:MacroStep.ClickOptions}" SelectedItem="{Binding ClickButton}" Visibility="{Binding IsClick, Converter={StaticResource BoolToVis}}" Margin="10,10,10,6" VerticalAlignment="Center"/>
-           <Border Grid.Row="1" Background="#33000000" CornerRadius="0,0,7,7" Padding="10,0">
-             <DockPanel>
-               <Button DockPanel.Dock="Right" Content="×" Padding="8,0" Margin="6,0,0,0" BorderThickness="0" Background="Transparent" VerticalAlignment="Center" Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="刪除此動作"/>
-               <TextBlock Text="{Binding Kind}" VerticalAlignment="Center" HorizontalAlignment="Left" FontSize="12" Margin="2,0,0,0"/>
-             </DockPanel>
-           </Border>
-          </Grid>
-         </Border><TextBlock Text="→" FontSize="21" Width="36" TextAlignment="Center" VerticalAlignment="Center"/>
-        </StackPanel></DataTemplate></ItemsControl.ItemTemplate>
+      <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="16,0" Height="52">
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="▷  測試" Command="{Binding TestSelectedCommand}" Width="100" Height="34"
+                  VerticalAlignment="Center" Margin="12,0,0,0"
+                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+          <TextBlock Text="巨集序列" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+          <TextBox Text="{Binding BindingName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource BareTextBox}"
+                   Width="220" Height="32" VerticalAlignment="Center" HorizontalAlignment="Left"
+                   HorizontalContentAlignment="Left" FontSize="15" Padding="8,4"
+                   ToolTip="編輯巨集名稱"/>
+        </DockPanel>
+      </Border>
+      <UniformGrid DockPanel.Dock="Bottom" Columns="3" Margin="16,10,16,14">
+        <Button Content="＋  鍵盤動作" Command="{Binding AddKeyStepCommand}" Height="40" Margin="0,0,8,0"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <Button Content="＋  等待時間" Command="{Binding AddWaitStepCommand}" Height="40" Margin="0,0,8,0"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <Button Content="＋  滑鼠動作" Command="{Binding AddClickStepCommand}" Height="40"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+      </UniformGrid>
+      <Border DockPanel.Dock="Top" Background="{DynamicResource AccentSurface}" Padding="14,12"
+              Visibility="{Binding IsRecordingKey, Converter={StaticResource BoolToVis}}">
+        <TextBlock Text="{Binding RecordBanner}" Foreground="{DynamicResource Accent}" FontSize="13"
+                   TextWrapping="Wrap" LineHeight="20"/>
+      </Border>
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                    Padding="16,16,12,8" VerticalAlignment="Center">
+       <ItemsControl ItemsSource="{Binding MacroSteps}">
+         <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" VerticalAlignment="Center"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+         <ItemsControl.ItemTemplate>
+           <DataTemplate>
+             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+               <Border Width="118" Height="118" CornerRadius="10" BorderBrush="{DynamicResource ControlBorder}"
+                       BorderThickness="1" ClipToBounds="True" VerticalAlignment="Center">
+                 <Border.Style>
+                   <Style TargetType="Border">
+                     <Setter Property="Background" Value="{DynamicResource InputBg}"/>
+                     <Style.Triggers>
+                       <DataTrigger Binding="{Binding IsKey}" Value="True">
+                         <Setter Property="Background" Value="#441721"/>
+                         <Setter Property="BorderBrush" Value="#743141"/>
+                       </DataTrigger>
+                     </Style.Triggers>
+                   </Style>
+                 </Border.Style>
+                 <Grid>
+                   <Grid.RowDefinitions>
+                     <RowDefinition Height="*"/>
+                     <RowDefinition Height="32"/>
+                   </Grid.RowDefinitions>
+                   <Button Grid.Row="0" Style="{StaticResource BareButton}"
+                           Visibility="{Binding IsKey, Converter={StaticResource BoolToVis}}"
+                           Command="{Binding DataContext.RecordKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                           CommandParameter="{Binding}" ToolTip="{Binding KeyLabel}" Margin="6">
+                     <TextBlock Text="{Binding KeyCap}" FontSize="28" FontFamily="Segoe UI Symbol, Segoe UI"
+                                FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                TextAlignment="Center"/>
+                   </Button>
+                   <StackPanel Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="8,6"
+                               Visibility="{Binding IsWait, Converter={StaticResource BoolToVis}}">
+                     <TextBlock Text="等待" FontSize="11" Foreground="{DynamicResource Muted}"
+                                HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                     <TextBox Text="{Binding Value, UpdateSourceTrigger=LostFocus}" Style="{StaticResource BareTextBox}"
+                              FontSize="22" FontWeight="SemiBold" Height="34" ToolTip="等待時間（毫秒）"/>
+                     <TextBlock Text="毫秒" FontSize="11" Foreground="{DynamicResource Muted}"
+                                HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                   </StackPanel>
+                   <ComboBox Grid.Row="0" ItemsSource="{x:Static local:MacroStep.ClickOptions}"
+                             SelectedItem="{Binding ClickButton}"
+                             Visibility="{Binding IsClick, Converter={StaticResource BoolToVis}}"
+                             Margin="10,16" VerticalAlignment="Center" MinHeight="36"/>
+                   <Border Grid.Row="1" Background="#33000000" CornerRadius="0,0,9,9" Padding="10,0">
+                     <DockPanel>
+                       <Button DockPanel.Dock="Right" Style="{StaticResource BareButton}" Content="×"
+                               Width="28" Height="28" FontSize="14"
+                               Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                               CommandParameter="{Binding}" ToolTip="刪除此動作"/>
+                       <TextBlock Text="{Binding Kind}" VerticalAlignment="Center" FontSize="12"
+                                  Foreground="{DynamicResource Muted}"/>
+                     </DockPanel>
+                   </Border>
+                 </Grid>
+               </Border>
+               <TextBlock Text="→" FontSize="20" Width="32" TextAlignment="Center" VerticalAlignment="Center"
+                          Foreground="{DynamicResource Muted}"/>
+             </StackPanel>
+           </DataTemplate>
+         </ItemsControl.ItemTemplate>
        </ItemsControl>
       </ScrollViewer>
      </DockPanel>
@@ -401,7 +448,7 @@
        </StackPanel>
      </StackPanel>
      <Button DockPanel.Dock="Right" Content="⚙" Style="{StaticResource ChromeButton}" Tag="settings" Click="OnNavigate" ToolTip="外觀設定"/>
-     <TextBlock DockPanel.Dock="Right" Text="v0.1.0" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="16,0"/>
+     <TextBlock DockPanel.Dock="Right" Text="v1.0.0" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="16,0"/>
      <ToggleButton DockPanel.Dock="Right" Content="巨集總開關" IsChecked="{Binding Armed}" Style="{StaticResource CyberSwitch}" VerticalAlignment="Center" Margin="18,0,0,0"/>
      <StackPanel VerticalAlignment="Center" Margin="12,0,24,0"><TextBlock Text="{Binding ConnectedSummary}" Foreground="{DynamicResource Accent}"/><TextBlock Text="{Binding Status}" Foreground="{DynamicResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/></StackPanel>
     </DockPanel>

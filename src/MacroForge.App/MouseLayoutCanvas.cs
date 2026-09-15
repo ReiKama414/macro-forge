@@ -113,10 +113,12 @@ public sealed class MouseLayoutCanvas : Canvas
     public void Rebuild()
     {
         if (_dragVisual is not null) return;
-        Children.Clear();
-
         var w = ActualWidth > 0 ? ActualWidth : Width;
         var h = ActualHeight > 0 ? ActualHeight : Height;
+        if (double.IsNaN(w) || double.IsNaN(h) || w < 8 || h < 8)
+            return;
+
+        Children.Clear();
         _bodyW = w * (SideView ? 0.55 : 0.33);
         _bodyH = h * (SideView ? 0.85 : 0.81);
         _bodyLeft = (w - _bodyW) / 2;

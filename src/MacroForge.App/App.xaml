@@ -41,6 +41,7 @@
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="OverridesDefaultStyle" Value="True"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -106,10 +107,35 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Foreground" Value="{DynamicResource Text}"/>
-      <Setter Property="Width" Value="44"/>
-      <Setter Property="Height" Value="32"/>
+      <Setter Property="Width" Value="40"/>
+      <Setter Property="Height" Value="40"/>
+      <Setter Property="MinWidth" Value="40"/>
+      <Setter Property="MinHeight" Value="40"/>
       <Setter Property="Padding" Value="0"/>
-      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bg" Background="{TemplateBinding Background}" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                RecognizesAccessKey="True"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bg" Property="Background" Value="{DynamicResource AccentHover}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bg" Property="Background" Value="{DynamicResource AccentSurface}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <Style x:Key="CyberSwitch" TargetType="ToggleButton">
@@ -403,9 +429,9 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
-    <Style x:Key="LogFilterChip" TargetType="RadioButton" BasedOn="{StaticResource Tile}">
+    <Style x:Key="LogFilterChip" TargetType="Button" BasedOn="{StaticResource GhostButton}">
       <Setter Property="Padding" Value="12,8"/>
-      <Setter Property="Margin" Value="0,0,8,0"/>
+      <Setter Property="Margin" Value="0,0,8,8"/>
       <Setter Property="MinHeight" Value="36"/>
       <Setter Property="FontSize" Value="12"/>
     </Style>
@@ -417,16 +443,39 @@
       <Setter Property="BorderBrush" Value="#3D7AB8"/>
       <Setter Property="BorderThickness" Value="1"/>
     </Style>
-    <Style x:Key="NavItem" TargetType="RadioButton" BasedOn="{StaticResource Tile}">
-      <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Height" Value="50"/>
+    <Style x:Key="NavItem" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="Height" Value="50"/>
       <Setter Property="Margin" Value="0,0,4,2"/>
-      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
-        <Border x:Name="surface" CornerRadius="5" Background="{TemplateBinding Background}"><Grid>
-          <Border x:Name="indicator" Width="3" HorizontalAlignment="Left" CornerRadius="2" Background="Transparent" Margin="0,4"/>
-          <ContentPresenter VerticalAlignment="Center" Margin="14,0,10,0"/>
-        </Grid></Border>
-        <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="surface" Property="Background" Value="{DynamicResource AccentSurface}"/><Setter TargetName="indicator" Property="Background" Value="{DynamicResource Accent}"/><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="surface" Property="Background" Value="{DynamicResource AccentHover}"/></Trigger></ControlTemplate.Triggers>
-      </ControlTemplate></Setter.Value></Setter>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="surface" CornerRadius="5" Background="{TemplateBinding Background}">
+              <Grid>
+                <Border x:Name="indicator" Width="3" HorizontalAlignment="Left" CornerRadius="2"
+                        Background="Transparent" Margin="0,4"/>
+                <ContentPresenter VerticalAlignment="Center" Margin="14,0,10,0"
+                                  TextBlock.Foreground="{TemplateBinding Foreground}"/>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="Tag" Value="Active">
+                <Setter TargetName="surface" Property="Background" Value="{DynamicResource AccentSurface}"/>
+                <Setter TargetName="indicator" Property="Background" Value="{DynamicResource Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="surface" Property="Background" Value="{DynamicResource AccentHover}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="Hyperlink">
       <Setter Property="Foreground" Value="{DynamicResource Accent}"/>

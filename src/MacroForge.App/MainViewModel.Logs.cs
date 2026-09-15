@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MacroForge.Core.Logging;
 using Microsoft.Win32;
 
@@ -9,10 +11,10 @@ namespace MacroForge.App;
 public sealed partial class MainViewModel
 {
     private readonly ObservableCollection<AppLogEntry> _visibleLogs = new();
-    private readonly ObservableCollection<int> _logPageNumbers = new();
+    private readonly ObservableCollection<LogPageItem> _logPageNumbers = new();
 
     public ObservableCollection<AppLogEntry> VisibleLogs => _visibleLogs;
-    public ObservableCollection<int> LogPageNumbers => _logPageNumbers;
+    public ObservableCollection<LogPageItem> LogPageNumbers => _logPageNumbers;
 
     public bool IsLogPage => Page == "log";
     public bool ShowDeviceWorkspace => !IsLogPage;
@@ -25,9 +27,10 @@ public sealed partial class MainViewModel
         {
             if (_logFilter == value) return;
             _logFilter = value;
-            LogPageIndex = 1;
+            _logPageIndex = 1;
             OnPropertyChanged();
-            RefreshLogView();
+            OnPropertyChanged(nameof(LogClearLabel));
+            RefreshLogView(preservePage: true);
         }
     }
 
@@ -39,9 +42,9 @@ public sealed partial class MainViewModel
         {
             if (_logSearch == value) return;
             _logSearch = value;
-            LogPageIndex = 1;
+            _logPageIndex = 1;
             OnPropertyChanged();
-            RefreshLogView();
+            RefreshLogView(preservePage: true);
         }
     }
 
@@ -53,9 +56,9 @@ public sealed partial class MainViewModel
         {
             if (_logLevelOption == value) return;
             _logLevelOption = value;
-            LogPageIndex = 1;
+            _logPageIndex = 1;
             OnPropertyChanged();
-            RefreshLogView();
+            RefreshLogView(preservePage: true);
         }
     }
 
@@ -67,9 +70,9 @@ public sealed partial class MainViewModel
         {
             if (_logTimeOption == value) return;
             _logTimeOption = value;
-            LogPageIndex = 1;
+            _logPageIndex = 1;
             OnPropertyChanged();
-            RefreshLogView();
+            RefreshLogView(preservePage: true);
         }
     }
 
@@ -96,7 +99,9 @@ public sealed partial class MainViewModel
     public int LogPageSize { get; } = 20;
     public int LogTotalCount { get; private set; }
     public int LogPageCount { get; private set; } = 1;
-    public string LogTotalText => $"共 {LogTotalCount} 筆日誌";
+    public string LogPageLabel => $"第 {LogPageIndex} / {LogPageCount} 頁";
+    public string LogTotalText =>
+        $"共 {LogTotalCount} 筆（每種類型最多 {AppLogService.MaxEntriesPerLevel} 筆，超出自動循環）";
 
     public int LogCountAll => AppLogService.Instance.Count;
     public int LogCountAction => AppLogService.Instance.CountByLevel(LogLevel.Action);
@@ -105,29 +110,33 @@ public sealed partial class MainViewModel
     public int LogCountVersion => AppLogService.Instance.CountByLevel(LogLevel.Version);
     public int LogCountInfo => AppLogService.Instance.CountByLevel(LogLevel.Info);
 
-    public string LogFilterAllLabel => $"全部日誌 ({LogCountAll})";
-    public string LogFilterActionLabel => $"操作記錄 ({LogCountAction})";
-    public string LogFilterErrorLabel => $"錯誤 ({LogCountError})";
-    public string LogFilterWarningLabel => $"警告 ({LogCountWarning})";
-    public string LogFilterVersionLabel => $"版本變更 ({LogCountVersion})";
-    public string LogFilterSystemLabel => $"系統 ({LogCountInfo})";
+    public string LogClearLabel => ResolveLogLevelFilter() is { } level
+        ? $"清除{LevelName(level)}"
+        : "清除全部";
+
+    public string LogCountSummary =>
+        $"全部 {LogCountAll}  ·  操作 {LogCountAction}  ·  錯誤 {LogCountError}  ·  警告 {LogCountWarning}  ·  版本 {LogCountVersion}  ·  系統 {LogCountInfo}";
 
     public ICommand ShowLogCommand { get; private set; } = null!;
+    public ICommand SetLogFilterCommand { get; private set; } = null!;
     public ICommand RefreshLogsCommand { get; private set; } = null!;
     public ICommand ExportLogsCommand { get; private set; } = null!;
+    public ICommand ClearLogsCommand { get; private set; } = null!;
     public ICommand LogPrevPageCommand { get; private set; } = null!;
     public ICommand LogNextPageCommand { get; private set; } = null!;
     public ICommand LogGoPageCommand { get; private set; } = null!;
 
     private void InitLoggingCommands()
     {
-        ShowLogCommand = new RelayCommand(_ =>
+        ShowLogCommand = new RelayCommand(_ => OpenLogPage());
+        SetLogFilterCommand = new RelayCommand(p =>
         {
-            Page = "log";
-            RefreshLogView();
+            if (p is string filter)
+                LogFilter = filter;
         });
         RefreshLogsCommand = new RelayCommand(_ => RefreshLogView());
         ExportLogsCommand = new RelayCommand(_ => ExportLogs());
+        ClearLogsCommand = new RelayCommand(_ => ClearLogs());
         LogPrevPageCommand = new RelayCommand(_ =>
         {
             if (LogPageIndex > 1)
@@ -140,11 +149,25 @@ public sealed partial class MainViewModel
         });
         LogGoPageCommand = new RelayCommand(p =>
         {
-            if (p is int page)
+            if (p is LogPageItem item)
+                LogPageIndex = item.Number;
+            else if (p is int page)
                 LogPageIndex = page;
             else if (p is string text && int.TryParse(text, out var n))
                 LogPageIndex = n;
         });
+    }
+
+    public void OpenLogPage()
+    {
+        Page = "log";
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            RefreshLogView();
+            return;
+        }
+        dispatcher.BeginInvoke(() => RefreshLogView(), DispatcherPriority.Loaded);
     }
 
     private void AttachLogService()
@@ -157,51 +180,61 @@ public sealed partial class MainViewModel
         });
     }
 
+    private bool _logViewBusy;
+
     public void RefreshLogView(bool preservePage = false)
     {
-        var level = ResolveLogLevelFilter();
-        TimeSpan? since = _logTimeOption switch
+        if (_logViewBusy)
+            return;
+        _logViewBusy = true;
+        try
         {
-            "近 1 小時" => TimeSpan.FromHours(1),
-            "近 24 小時" => TimeSpan.FromHours(24),
-            "近 7 天" => TimeSpan.FromDays(7),
-            _ => null
-        };
+            var level = ResolveLogLevelFilter();
+            TimeSpan? since = _logTimeOption switch
+            {
+                "近 1 小時" => TimeSpan.FromHours(1),
+                "近 24 小時" => TimeSpan.FromHours(24),
+                "近 7 天" => TimeSpan.FromDays(7),
+                _ => null
+            };
 
-        var filtered = AppLogService.Instance.Query(level, _logSearch, since);
-        LogTotalCount = filtered.Count;
-        LogPageCount = Math.Max(1, (int)Math.Ceiling(LogTotalCount / (double)LogPageSize));
-        if (!preservePage)
-            _logPageIndex = 1;
-        else if (_logPageIndex > LogPageCount)
-            _logPageIndex = LogPageCount;
+            var filtered = AppLogService.Instance.Query(level, _logSearch, since);
+            LogTotalCount = filtered.Count;
+            LogPageCount = Math.Max(1, (int)Math.Ceiling(LogTotalCount / (double)LogPageSize));
+            if (!preservePage)
+                _logPageIndex = 1;
+            else if (_logPageIndex > LogPageCount)
+                _logPageIndex = LogPageCount;
 
-        var pageItems = filtered
-            .Skip((_logPageIndex - 1) * LogPageSize)
-            .Take(LogPageSize)
-            .ToList();
+            var pageItems = filtered
+                .Skip((_logPageIndex - 1) * LogPageSize)
+                .Take(LogPageSize)
+                .ToList();
 
-        _visibleLogs.Clear();
-        foreach (var item in pageItems)
-            _visibleLogs.Add(item);
+            _visibleLogs.Clear();
+            foreach (var item in pageItems)
+                _visibleLogs.Add(item);
 
-        _logPageNumbers.Clear();
-        var start = Math.Max(1, _logPageIndex - 2);
-        var end = Math.Min(LogPageCount, start + 4);
-        start = Math.Max(1, end - 4);
-        for (var i = start; i <= end; i++)
-            _logPageNumbers.Add(i);
-
-        OnPropertyChanged(nameof(LogPageIndex));
-        OnPropertyChanged(nameof(LogPageCount));
-        OnPropertyChanged(nameof(LogTotalCount));
-        OnPropertyChanged(nameof(LogTotalText));
-        NotifyLogCounts();
+            OnPropertyChanged(nameof(LogPageIndex));
+            OnPropertyChanged(nameof(LogPageCount));
+            OnPropertyChanged(nameof(LogPageLabel));
+            OnPropertyChanged(nameof(LogTotalCount));
+            OnPropertyChanged(nameof(LogTotalText));
+            OnPropertyChanged(nameof(LogClearLabel));
+            NotifyLogCounts();
+        }
+        catch
+        {
+            // Keep the log page visible even if a refresh fails.
+        }
+        finally
+        {
+            _logViewBusy = false;
+        }
     }
 
     private LogLevel? ResolveLogLevelFilter()
     {
-        // Tab filter takes priority over dropdown when not "all".
         if (_logFilter is not "all")
         {
             return _logFilter switch
@@ -225,6 +258,39 @@ public sealed partial class MainViewModel
             _ => null
         };
     }
+
+    private void ClearLogs()
+    {
+        if (Application.Current?.MainWindow is not Window owner)
+            return;
+
+        var level = ResolveLogLevelFilter();
+        var scope = level is null ? "全部日誌" : $"{LevelName(level.Value)}日誌";
+        var answer = CyberDialog.Confirm(
+            owner,
+            "清除日誌",
+            $"確定要清除{scope}嗎？此動作無法復原。\n\n（未手動清除時，各類型超過 {AppLogService.MaxEntriesPerLevel} 筆會自動循環覆蓋最舊紀錄。）",
+            yesLabel: "清除",
+            noLabel: "取消",
+            height: 300);
+
+        if (answer != true)
+            return;
+
+        var removed = AppLogService.Instance.Clear(level);
+        Status = $"已清除 {removed} 筆日誌";
+        _logPageIndex = 1;
+        RefreshLogView();
+    }
+
+    private static string LevelName(LogLevel level) => level switch
+    {
+        LogLevel.Action => "操作",
+        LogLevel.Warning => "警告",
+        LogLevel.Error => "錯誤",
+        LogLevel.Version => "版本",
+        _ => "系統"
+    };
 
     private void ExportLogs()
     {
@@ -263,8 +329,7 @@ public sealed partial class MainViewModel
                  {
                      nameof(LogCountAll), nameof(LogCountAction), nameof(LogCountError),
                      nameof(LogCountWarning), nameof(LogCountVersion), nameof(LogCountInfo),
-                     nameof(LogFilterAllLabel), nameof(LogFilterActionLabel), nameof(LogFilterErrorLabel),
-                     nameof(LogFilterWarningLabel), nameof(LogFilterVersionLabel), nameof(LogFilterSystemLabel)
+                     nameof(LogClearLabel), nameof(LogCountSummary)
                  })
             OnPropertyChanged(name);
     }

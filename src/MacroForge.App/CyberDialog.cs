@@ -73,10 +73,22 @@ internal static class CyberDialog
         var headerDock = new DockPanel { LastChildFill = true };
         var close = new Button
         {
-            Content = "✕",
             Style = (Style)owner.FindResource("ChromeButton"),
-            Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = "關閉"
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "關閉",
+            Content = new TextBlock
+            {
+                Text = "✕",
+                FontSize = 13,
+                FontFamily = new FontFamily("Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0)
+            }
         };
         WindowChrome.SetIsHitTestVisibleInChrome(close, true);
         close.Click += (_, _) => dialog.Close();
@@ -137,11 +149,21 @@ internal static class CyberDialog
 
         var done = new Button
         {
-            Content = "關閉",
             MinWidth = 96,
-            Padding = new Thickness(20, 8, 20, 8),
+            Padding = new Thickness(20, 0, 20, 0),
+            Height = 36,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Style = (Style)owner.FindResource("PrimaryButton")
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Style = (Style)owner.FindResource("PrimaryButton"),
+            Content = new TextBlock
+            {
+                Text = "關閉",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0)
+            }
         };
         done.Click += (_, _) => dialog.Close();
         Grid.SetColumn(done, 1);
@@ -191,6 +213,161 @@ internal static class CyberDialog
         };
 
         dialog.ShowDialog();
+    }
+
+    public static bool? Confirm(
+        Window owner,
+        string title,
+        string description,
+        string yesLabel = "是",
+        string noLabel = "否",
+        string? checkboxLabel = null,
+        Action<bool>? onCheckbox = null,
+        double width = 480,
+        double height = 320)
+    {
+        bool? result = null;
+        var dialog = Create(owner, title, width, height);
+        dialog.DataContext = owner.DataContext;
+
+        var root = new Border
+        {
+            Background = (Brush)owner.FindResource("Bg"),
+            BorderBrush = (Brush)owner.FindResource("Accent"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10)
+        };
+
+        var layout = new DockPanel();
+        var header = new Border
+        {
+            Height = 48,
+            Background = (Brush)owner.FindResource("ChromeSurface"),
+            BorderBrush = (Brush)owner.FindResource("Stroke"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            CornerRadius = new CornerRadius(9, 9, 0, 0)
+        };
+        var headerDock = new DockPanel { LastChildFill = true };
+        var close = new Button
+        {
+            Style = (Style)owner.FindResource("ChromeButton"),
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = "關閉",
+            Content = new TextBlock
+            {
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Text = "\uE8BB",
+                FontSize = 12,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            }
+        };
+        WindowChrome.SetIsHitTestVisibleInChrome(close, true);
+        close.Click += (_, _) => dialog.Close();
+        DockPanel.SetDock(close, Dock.Right);
+        headerDock.Children.Add(close);
+        headerDock.Children.Add(new TextBlock
+        {
+            Text = title,
+            Margin = new Thickness(20, 0, 12, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)owner.FindResource("Text")
+        });
+        header.Child = headerDock;
+        DockPanel.SetDock(header, Dock.Top);
+        layout.Children.Add(header);
+
+        var footer = new Border
+        {
+            Background = (Brush)owner.FindResource("ChromeSurface"),
+            BorderBrush = (Brush)owner.FindResource("Stroke"),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(22, 16, 22, 16),
+            CornerRadius = new CornerRadius(0, 0, 9, 9)
+        };
+        var footerPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        void Finish(bool? value)
+        {
+            result = value;
+            dialog.Close();
+        }
+
+        var no = new Button
+        {
+            MinWidth = 96,
+            Height = 36,
+            Margin = new Thickness(0, 0, 10, 0),
+            Padding = new Thickness(20, 0, 20, 0),
+            Style = (Style)owner.FindResource("GhostButton"),
+            Content = noLabel
+        };
+        no.Click += (_, _) => Finish(false);
+        var yes = new Button
+        {
+            MinWidth = 96,
+            Height = 36,
+            Padding = new Thickness(20, 0, 20, 0),
+            Style = (Style)owner.FindResource("PrimaryButton"),
+            Content = yesLabel
+        };
+        yes.Click += (_, _) => Finish(true);
+        footerPanel.Children.Add(no);
+        footerPanel.Children.Add(yes);
+        footer.Child = footerPanel;
+        DockPanel.SetDock(footer, Dock.Bottom);
+        layout.Children.Add(footer);
+
+        var body = new StackPanel { Margin = new Thickness(28, 22, 28, 22) };
+        body.Children.Add(new TextBlock
+        {
+            Text = description,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 23,
+            Foreground = (Brush)owner.FindResource("Muted"),
+            Margin = new Thickness(0, 0, 0, 12)
+        });
+
+        if (!string.IsNullOrWhiteSpace(checkboxLabel))
+        {
+            var check = new CheckBox
+            {
+                Content = checkboxLabel,
+                Foreground = (Brush)owner.FindResource("Text"),
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            check.Checked += (_, _) => onCheckbox?.Invoke(true);
+            check.Unchecked += (_, _) => onCheckbox?.Invoke(false);
+            body.Children.Add(check);
+        }
+
+        layout.Children.Add(body);
+        root.Child = layout;
+        dialog.Content = root;
+        dialog.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                Finish(null);
+                e.Handled = true;
+            }
+        };
+        dialog.SourceInitialized += (_, _) =>
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(dialog).Handle;
+            WindowChromeHelper.ApplyRoundedCyberChrome(handle,
+                (Color)owner.FindResource("AccentColor"));
+        };
+        dialog.ShowDialog();
+        return result;
     }
 
     public static Button ActionButton(Window owner, string label, Action onClick)

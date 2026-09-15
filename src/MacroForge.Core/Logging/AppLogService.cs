@@ -36,7 +36,9 @@ public sealed class AppLogService
 {
     public static AppLogService Instance { get; } = new();
 
-    public const int MaxEntries = 2000;
+    /// <summary>Each log level keeps up to this many entries (auto FIFO).</summary>
+    public const int MaxEntriesPerLevel = 2000;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -100,12 +102,33 @@ public sealed class AppLogService
         lock (_gate)
         {
             _entries.Insert(0, entry);
-            while (_entries.Count > MaxEntries)
-                _entries.RemoveAt(_entries.Count - 1);
+            TrimLevelLocked(level);
         }
 
-        SchedulePersist(entry);
+        SchedulePersist();
         Changed?.Invoke();
+    }
+
+    /// <summary>Clear all entries, or only one level when specified.</summary>
+    public int Clear(LogLevel? level = null)
+    {
+        int removed;
+        lock (_gate)
+        {
+            if (level is null)
+            {
+                removed = _entries.Count;
+                _entries.Clear();
+            }
+            else
+            {
+                removed = _entries.RemoveAll(e => e.Level == level.Value);
+            }
+        }
+
+        SchedulePersist();
+        Changed?.Invoke();
+        return removed;
     }
 
     public IReadOnlyList<AppLogEntry> Query(
@@ -146,9 +169,24 @@ public sealed class AppLogService
         string.Join(Environment.NewLine, entries.Select(e =>
             $"{e.TimeText}\t{e.LevelLabel}\t{e.Category}\t{e.Message.Replace("\r", " ").Replace("\n", " | ")}"));
 
-    private void SchedulePersist(AppLogEntry entry)
+    private void TrimLevelLocked(LogLevel level)
     {
-        // Append asynchronously; coalesce bursts so macro loops don't thrash disk.
+        var count = 0;
+        for (var i = 0; i < _entries.Count; i++)
+        {
+            if (_entries[i].Level != level)
+                continue;
+            count++;
+            if (count <= MaxEntriesPerLevel)
+                continue;
+            _entries.RemoveAt(i);
+            i--;
+        }
+    }
+
+    private void SchedulePersist()
+    {
+        // Coalesce bursts so macro loops don't thrash disk.
         if (Interlocked.Increment(ref _persistPending) > 1)
             return;
 
@@ -199,12 +237,12 @@ public sealed class AppLogService
             }
             // Newest first in memory
             loaded.Reverse();
-            if (loaded.Count > MaxEntries)
-                loaded = loaded.Take(MaxEntries).ToList();
             lock (_gate)
             {
                 _entries.Clear();
                 _entries.AddRange(loaded);
+                foreach (LogLevel level in Enum.GetValues<LogLevel>())
+                    TrimLevelLocked(level);
             }
         }
         catch

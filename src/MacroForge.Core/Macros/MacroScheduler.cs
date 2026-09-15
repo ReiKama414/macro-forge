@@ -18,9 +18,12 @@ public sealed class RunningMacro
     public CancellationTokenSource Cts { get; } = new();
     public string State { get; set; } = "running";
     public int ExecutionCount { get; set; }
+    public DateTimeOffset StartedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? NextRunAt { get; set; }
     public Task? Task { get; set; }
     public int StartupDelayMs { get; init; }
+    /// <summary>True after Stop() announced this job, so RunAsync won't double-log.</summary>
+    public bool StopAnnounced { get; set; }
 }
 
 public sealed class MacroScheduler : IDisposable
@@ -106,15 +109,9 @@ public sealed class MacroScheduler : IDisposable
         _running[binding.Id] = job;
         job.Task = Task.Run(() => RunAsync(job));
         Changed?.Invoke();
-        var triggerLabel = trigger switch
-        {
-            "hold" => "按住循環",
-            "count" => "固定次數",
-            "interval" => "定時執行",
-            "once" => "單次執行",
-            _ => "切換循環"
-        };
-        AppLogService.Instance.Action("自動化", $"開始執行巨集：{job.Name} (觸發方式：{triggerLabel})");
+        var triggerLabel = TriggerLabel(trigger);
+        AppLogService.Instance.Action("自動化",
+            $"開始執行巨集：{job.Name}（觸發方式：{triggerLabel}）");
     }
 
     public void Pause(string id)
@@ -123,6 +120,8 @@ public sealed class MacroScheduler : IDisposable
         {
             job.State = "paused";
             Changed?.Invoke();
+            AppLogService.Instance.Action("自動化",
+                $"已暫停巨集：{job.Name}（已執行 {job.ExecutionCount} 次，已運行 {FormatElapsed(job.StartedAt)}）");
         }
     }
 
@@ -132,6 +131,8 @@ public sealed class MacroScheduler : IDisposable
         {
             job.State = ScopeMatcher.Matches(job.Scope, _foreground.Current) ? "running" : "waiting";
             Changed?.Invoke();
+            AppLogService.Instance.Action("自動化",
+                $"已繼續巨集：{job.Name}（已執行 {job.ExecutionCount} 次，已運行 {FormatElapsed(job.StartedAt)}）");
         }
     }
 
@@ -142,10 +143,14 @@ public sealed class MacroScheduler : IDisposable
         if (!_running.TryRemove(id, out var job))
             return;
         job.State = "stopped";
+        job.StopAnnounced = true;
         job.Cts.Cancel();
         Changed?.Invoke();
         if (announce)
-            AppLogService.Instance.Action("自動化", $"已停止巨集：{job.Name}");
+        {
+            AppLogService.Instance.Action("自動化",
+                $"已停止巨集：{job.Name}（共執行 {job.ExecutionCount} 次，持續 {FormatElapsed(job.StartedAt)}）");
+        }
     }
 
     public void StopAll()
@@ -193,7 +198,7 @@ public sealed class MacroScheduler : IDisposable
                 if (job.Trigger is "once" or "count" || job.ExecutionCount == 1 || job.ExecutionCount % 10 == 0)
                 {
                     AppLogService.Instance.Info("執行",
-                        $"巨集「{job.Name}」已執行 {job.ExecutionCount} 次");
+                        $"巨集「{job.Name}」已執行 {job.ExecutionCount} 次（已運行 {FormatElapsed(job.StartedAt)}）");
                 }
 
                 if (job.Trigger is "once")
@@ -220,6 +225,14 @@ public sealed class MacroScheduler : IDisposable
             // Only remove ourselves — a newer Start() may already own this id.
             if (_running.TryGetValue(job.Id, out var current) && ReferenceEquals(current, job))
                 _running.TryRemove(job.Id, out _);
+
+            if (!job.StopAnnounced)
+            {
+                job.StopAnnounced = true;
+                AppLogService.Instance.Action("自動化",
+                    $"巨集完成：{job.Name}（共執行 {job.ExecutionCount} 次，持續 {FormatElapsed(job.StartedAt)}）");
+            }
+
             if (job.State != "stopped")
                 job.State = "stopped";
             Changed?.Invoke();
@@ -397,6 +410,27 @@ public sealed class MacroScheduler : IDisposable
         NextRunAt = job.NextRunAt,
         InScope = ScopeMatcher.Matches(job.Scope, _foreground.Current)
     };
+
+    private static string TriggerLabel(string trigger) => trigger switch
+    {
+        "hold" => "按住循環",
+        "count" => "固定次數",
+        "interval" => "定時執行",
+        "once" => "單次執行",
+        _ => "切換循環"
+    };
+
+    private static string FormatElapsed(DateTimeOffset startedAt)
+    {
+        var span = DateTimeOffset.UtcNow - startedAt;
+        if (span < TimeSpan.Zero)
+            span = TimeSpan.Zero;
+        if (span.TotalHours >= 1)
+            return $"{(int)span.TotalHours} 小時 {span.Minutes} 分 {span.Seconds} 秒";
+        if (span.TotalMinutes >= 1)
+            return $"{(int)span.TotalMinutes} 分 {span.Seconds} 秒";
+        return $"{(int)Math.Max(0, span.TotalSeconds)} 秒";
+    }
 
     private static string NormalizeTrigger(string? trigger) => (trigger ?? "toggle").ToLowerInvariant() switch
     {
