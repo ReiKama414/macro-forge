@@ -10,6 +10,11 @@
     <RootNamespace>MacroForge.App</RootNamespace>
     <AssemblyName>MacroForge</AssemblyName>
     <Product>Universal Mouse Macro Manager</Product>
+    <Company>reiKama414</Company>
+    <Authors>reiKama414</Authors>
+    <Copyright>Copyright (c) 2026 reiKama414</Copyright>
+    <Description>Universal mouse macro manager by reiKama414</Description>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

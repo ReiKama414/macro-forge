@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using MacroForge.Core.Model;
 using MacroForge.Core.Native;
@@ -6,6 +7,9 @@ namespace MacroForge.Core.Input;
 
 public static class RawInputParser
 {
+    private static readonly ConcurrentDictionary<IntPtr, uint> MouseButtonStates = new();
+    private static readonly ConcurrentDictionary<IntPtr, byte[]> HidActiveReports = new();
+
     public static IReadOnlyList<RawInputEvent> Parse(IntPtr lParam)
     {
         uint size = 0;
@@ -79,11 +83,13 @@ public static class RawInputParser
             });
         }
 
-        if (rawButtons != 0)
+        var previousButtons = MouseButtonStates.GetOrAdd(header.hDevice, 0);
+        if (rawButtons != previousButtons)
         {
             for (var bit = 0; bit < 32; bit++)
             {
-                if ((rawButtons & (1u << bit)) == 0)
+                var mask = 1u << bit;
+                if ((rawButtons & mask) == (previousButtons & mask))
                     continue;
                 var index = bit + 1;
                 if (index <= 5)
@@ -92,11 +98,12 @@ public static class RawInputParser
                 {
                     DeviceHandle = header.hDevice,
                     Source = InputSource.Mouse,
-                    IsDown = true,
+                    IsDown = (rawButtons & mask) != 0,
                     RawButtonIndex = index,
                     HidUsageId = index
                 });
             }
+            MouseButtonStates[header.hDevice] = rawButtons;
         }
 
         return events;
@@ -167,20 +174,46 @@ public static class RawInputParser
         if (dwSizeHid <= 0 || dwCount <= 0)
             return Array.Empty<RawInputEvent>();
 
+        var events = new List<RawInputEvent>();
         var dataOffset = offset + 8;
-        var total = Math.Min(dwSizeHid * dwCount, size - dataOffset);
-        var report = new byte[total];
-        Marshal.Copy(buffer + dataOffset, report, 0, total);
-
-        return new[]
+        for (var reportIndex = 0; reportIndex < dwCount; reportIndex++)
         {
-            new RawInputEvent
+            var start = dataOffset + reportIndex * dwSizeHid;
+            if (start < dataOffset || start + dwSizeHid > size)
+                break;
+
+            var report = new byte[dwSizeHid];
+            Marshal.Copy(buffer + start, report, 0, dwSizeHid);
+            var isReleased = report.All(b => b == 0);
+            HidActiveReports.TryGetValue(header.hDevice, out var previous);
+
+            if (isReleased)
             {
-                DeviceHandle = header.hDevice,
-                Source = InputSource.UnknownHid,
-                IsDown = true,
-                HidReport = report
+                if (previous is not null)
+                {
+                    events.Add(HidEvent(header.hDevice, previous, isDown: false));
+                    HidActiveReports.TryRemove(header.hDevice, out _);
+                }
+                continue;
             }
-        };
+
+            if (previous is not null && !previous.SequenceEqual(report))
+                events.Add(HidEvent(header.hDevice, previous, isDown: false));
+
+            if (previous is null || !previous.SequenceEqual(report))
+                events.Add(HidEvent(header.hDevice, report, isDown: true));
+
+            HidActiveReports[header.hDevice] = report;
+        }
+
+        return events;
     }
+
+    private static RawInputEvent HidEvent(IntPtr handle, byte[] report, bool isDown) => new()
+    {
+        DeviceHandle = handle,
+        Source = InputSource.UnknownHid,
+        IsDown = isDown,
+        HidReport = report.ToArray()
+    };
 }

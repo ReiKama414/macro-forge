@@ -17,5 +17,9 @@ public sealed class RawInputEvent
     public string? DevicePathHint { get; init; }
 
     public string Signature =>
-        $"{Source}|raw:{RawButtonIndex}|hid:{HidUsageId}|vk:{VirtualKey}|scan:{ScanCode}|con:{ConsumerUsage}|wheel:{WheelDelta}";
+        $"{Source}|raw:{RawButtonIndex}|hid:{HidUsageId}|vk:{VirtualKey}|scan:{ScanCode}|con:{ConsumerUsage}|report:{ReportKey}";
+
+    public string ReportKey => HidReport is { Length: > 0 }
+        ? Convert.ToHexString(HidReport)
+        : "";
 }

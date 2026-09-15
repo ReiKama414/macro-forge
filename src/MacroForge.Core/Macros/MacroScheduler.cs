@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using MacroForge.Core.Logging;
 using MacroForge.Core.Model;
 using MacroForge.Core.Scope;
 
@@ -19,6 +20,7 @@ public sealed class RunningMacro
     public int ExecutionCount { get; set; }
     public DateTimeOffset? NextRunAt { get; set; }
     public Task? Task { get; set; }
+    public int StartupDelayMs { get; init; }
 }
 
 public sealed class MacroScheduler : IDisposable
@@ -84,12 +86,15 @@ public sealed class MacroScheduler : IDisposable
             Stop(bindingId);
     }
 
-    public void Start(ButtonBinding binding, MacroDefinition macro, string trigger)
+    public void Start(ButtonBinding binding, MacroDefinition macro, string trigger, int startupDelayMs = 0)
     {
-        Stop(binding.Id);
+        Stop(binding.Id, announce: false);
         var job = new RunningMacro
         {
             Id = binding.Id,
+            StartupDelayMs = Math.Max(0, startupDelayMs),
+            State = startupDelayMs > 0 ? "waiting" : "running",
+            NextRunAt = startupDelayMs > 0 ? DateTimeOffset.UtcNow.AddMilliseconds(startupDelayMs) : null,
             Name = string.IsNullOrWhiteSpace(binding.Name) ? macro.Name : binding.Name,
             BindingId = binding.Id,
             Scope = binding.Scope,
@@ -98,9 +103,18 @@ public sealed class MacroScheduler : IDisposable
             IntervalMs = Math.Max(1, binding.IntervalMs),
             RepeatCount = Math.Max(1, binding.RepeatCount)
         };
-        job.Task = Task.Run(() => RunAsync(job));
         _running[binding.Id] = job;
+        job.Task = Task.Run(() => RunAsync(job));
         Changed?.Invoke();
+        var triggerLabel = trigger switch
+        {
+            "hold" => "按住循環",
+            "count" => "固定次數",
+            "interval" => "定時執行",
+            "once" => "單次執行",
+            _ => "切換循環"
+        };
+        AppLogService.Instance.Action("自動化", $"開始執行巨集：{job.Name} (觸發方式：{triggerLabel})");
     }
 
     public void Pause(string id)
@@ -121,13 +135,17 @@ public sealed class MacroScheduler : IDisposable
         }
     }
 
-    public void Stop(string id)
+    public void Stop(string id) => Stop(id, announce: true);
+
+    public void Stop(string id, bool announce)
     {
         if (!_running.TryRemove(id, out var job))
             return;
         job.State = "stopped";
         job.Cts.Cancel();
         Changed?.Invoke();
+        if (announce)
+            AppLogService.Instance.Action("自動化", $"已停止巨集：{job.Name}");
     }
 
     public void StopAll()
@@ -157,6 +175,9 @@ public sealed class MacroScheduler : IDisposable
         var ct = job.Cts.Token;
         try
         {
+            if (job.StartupDelayMs > 0)
+                await Task.Delay(job.StartupDelayMs, ct);
+            job.NextRunAt = null;
             while (!ct.IsCancellationRequested)
             {
                 if (!await WaitUntilReady(job, ct))
@@ -169,6 +190,11 @@ public sealed class MacroScheduler : IDisposable
                 job.ExecutionCount++;
                 job.NextRunAt = DateTimeOffset.UtcNow.AddMilliseconds(job.IntervalMs);
                 Changed?.Invoke();
+                if (job.Trigger is "once" or "count" || job.ExecutionCount == 1 || job.ExecutionCount % 10 == 0)
+                {
+                    AppLogService.Instance.Info("執行",
+                        $"巨集「{job.Name}」已執行 {job.ExecutionCount} 次");
+                }
 
                 if (job.Trigger is "once")
                     break;
@@ -214,7 +240,15 @@ public sealed class MacroScheduler : IDisposable
                 continue;
             }
 
-            if (ScopeMatcher.Matches(job.Scope, _foreground.Current))
+            var foreground = _foreground.Current;
+            if (ForegroundProcess.IsOwnApplication(foreground))
+            {
+                if (job.State != "waiting") { job.State = "waiting"; Changed?.Invoke(); }
+                await Task.Delay(50, ct);
+                continue;
+            }
+
+            if (ScopeMatcher.Matches(job.Scope, foreground))
             {
                 if (job.State != "running")
                 {
@@ -303,7 +337,8 @@ public sealed class MacroScheduler : IDisposable
 
             if (action.Type.Equals("delay", StringComparison.OrdinalIgnoreCase))
             {
-                await Task.Delay(Math.Max(0, action.DelayMs), ct);
+                if (!await WaitActionDelay(job, Math.Max(0, action.DelayMs), ct))
+                    return;
                 continue;
             }
 
@@ -328,6 +363,24 @@ public sealed class MacroScheduler : IDisposable
             else
                 _sender.SendKeys(action.Keys);
         }
+    }
+
+    private async Task<bool> WaitActionDelay(
+        RunningMacro job,
+        int delayMs,
+        CancellationToken ct)
+    {
+        var remaining = delayMs;
+        while (remaining > 0 && !ct.IsCancellationRequested)
+        {
+            if (!await WaitUntilReady(job, ct))
+                return false;
+
+            var slice = Math.Min(50, remaining);
+            await Task.Delay(slice, ct);
+            remaining -= slice;
+        }
+        return !ct.IsCancellationRequested;
     }
 
     private static string LeavePolicy(RunningMacro job) =>

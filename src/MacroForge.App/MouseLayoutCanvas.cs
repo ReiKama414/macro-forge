@@ -12,12 +12,9 @@ namespace MacroForge.App;
 
 public sealed class MouseLayoutCanvas : Canvas
 {
-    private static readonly Color Neon = Color.FromRgb(0x2C, 0xE5, 0x8B);
-    private static readonly Color NeonSoft = Color.FromRgb(0x5C, 0xFF, 0xB0);
-    private static readonly Color Shell = Color.FromRgb(0x10, 0x21, 0x19);
-    private static readonly Color ShellDeep = Color.FromRgb(0x05, 0x0A, 0x08);
-    private static readonly Color Edge = Color.FromRgb(0x24, 0x5C, 0x42);
-    private static readonly Color Ink = Color.FromRgb(0x04, 0x14, 0x0C);
+    private Color Neon => (AccentBrush as SolidColorBrush)?.Color ?? Color.FromRgb(0x2C, 0xE5, 0x8B);
+    private Color NeonSoft => Color.Multiply(Neon, 1.25f);
+    private Color Edge => ThemePalette.Mix(Neon, 70, .23);
     private static readonly Color Label = Color.FromRgb(0xEA, 0xFF, 0xF4);
 
     public static readonly DependencyProperty ButtonsProperty =
@@ -35,6 +32,18 @@ public sealed class MouseLayoutCanvas : Canvas
     public static readonly DependencyProperty SelectedButtonIdProperty =
         DependencyProperty.Register(nameof(SelectedButtonId), typeof(string), typeof(MouseLayoutCanvas),
             new PropertyMetadata(null, (d, _) => ((MouseLayoutCanvas)d).Rebuild()));
+
+    public static readonly DependencyProperty AccentBrushProperty =
+        DependencyProperty.Register(nameof(AccentBrush), typeof(Brush), typeof(MouseLayoutCanvas),
+            new PropertyMetadata(Brushes.LimeGreen, (d, _) => ((MouseLayoutCanvas)d).Rebuild()));
+
+    public static readonly DependencyProperty ButtonLabelsProperty = DependencyProperty.Register(nameof(ButtonLabels),
+        typeof(IReadOnlyDictionary<string, string>), typeof(MouseLayoutCanvas), new PropertyMetadata(null, (d, _) => ((MouseLayoutCanvas)d).Rebuild()));
+    public IReadOnlyDictionary<string, string>? ButtonLabels
+    {
+        get => (IReadOnlyDictionary<string, string>?)GetValue(ButtonLabelsProperty);
+        set => SetValue(ButtonLabelsProperty, value);
+    }
 
     public IEnumerable<MouseButtonDefinition>? Buttons
     {
@@ -60,6 +69,14 @@ public sealed class MouseLayoutCanvas : Canvas
         set => SetValue(SelectedButtonIdProperty, value);
     }
 
+    public Brush AccentBrush
+    {
+        get => (Brush)GetValue(AccentBrushProperty);
+        set => SetValue(AccentBrushProperty, value);
+    }
+    public static readonly DependencyProperty SideViewProperty = DependencyProperty.Register(nameof(SideView), typeof(bool), typeof(MouseLayoutCanvas), new PropertyMetadata(false, (d, _) => ((MouseLayoutCanvas)d).Rebuild()));
+    public bool SideView { get => (bool)GetValue(SideViewProperty); set => SetValue(SideViewProperty, value); }
+
     public event Action<string>? ButtonClicked;
     public event Action<string, double, double>? ButtonMoved;
 
@@ -73,8 +90,8 @@ public sealed class MouseLayoutCanvas : Canvas
 
     public MouseLayoutCanvas()
     {
-        Width = 440;
-        Height = 540;
+        Width = 640;
+        Height = 480;
         Background = Brushes.Transparent;
         Loaded += (_, _) => Rebuild();
         SizeChanged += (_, _) => Rebuild();
@@ -95,14 +112,15 @@ public sealed class MouseLayoutCanvas : Canvas
 
     public void Rebuild()
     {
+        if (_dragVisual is not null) return;
         Children.Clear();
 
         var w = ActualWidth > 0 ? ActualWidth : Width;
         var h = ActualHeight > 0 ? ActualHeight : Height;
-        _bodyW = w * 0.42;
-        _bodyH = h * 0.66;
+        _bodyW = w * (SideView ? 0.55 : 0.33);
+        _bodyH = h * (SideView ? 0.85 : 0.81);
         _bodyLeft = (w - _bodyW) / 2;
-        _bodyTop = h * 0.11;
+        _bodyTop = h * 0.13;
 
         var list = Buttons?.ToList() ?? new List<MouseButtonDefinition>();
         DrawChassis(list);
@@ -127,8 +145,19 @@ public sealed class MouseLayoutCanvas : Canvas
     private (double X, double Y) PositionOf(MouseButtonDefinition button, List<MouseButtonDefinition> all)
     {
         var node = Layout?.Buttons.FirstOrDefault(n => n.ButtonId == button.Id);
-        if (node is not null)
+        var extrasForLayout = all.Where(b => !LayoutFactory.IsPrimary(b)).ToList();
+        var slot = Math.Max(0, extrasForLayout.FindIndex(b => b.Id == button.Id));
+        var original = LayoutFactory.DefaultPosition(button, slot, Math.Max(1, extrasForLayout.Count));
+        if (node is not null && (Math.Abs(node.X - original.X) > .001 || Math.Abs(node.Y - original.Y) > .001))
             return (node.X, node.Y);
+        if (button.RawButtonIndex == 1) return (.17, .23);
+        if (button.RawButtonIndex == 2) return (.83, .23);
+        if (button.RawButtonIndex == 3) return (.50, .065);
+        if (button.RawButtonIndex == 4) return (.15, .49);
+        if (button.RawButtonIndex == 5) return (.15, .70);
+        var remaining = all.Where(b => b.RawButtonIndex is not (1 or 2 or 3 or 4 or 5)).ToList();
+        var remainingIndex = remaining.FindIndex(b => b.Id == button.Id);
+        if (remainingIndex >= 0) return (.84, .43 + remainingIndex * (.47 / Math.Max(1, remaining.Count - 1)));
         var extras = all.Where(b => !LayoutFactory.IsPrimary(b)).ToList();
         var index = extras.FindIndex(b => b.Id == button.Id);
         return LayoutFactory.DefaultPosition(button, Math.Max(0, index), Math.Max(1, extras.Count));
@@ -137,127 +166,23 @@ public sealed class MouseLayoutCanvas : Canvas
     private Point BodyPoint(double nx, double ny) =>
         new(_bodyLeft + nx * _bodyW, _bodyTop + ny * _bodyH);
 
+    // All chassis parts share a coordinate space; stretching each path separately
+    // expands small details over the entire mouse and distorts hit targets.
+    private Geometry BodyGeometry(string path)
+    {
+        var geometry = Geometry.Parse(path).Clone();
+        geometry.Transform = new ScaleTransform(_bodyW, _bodyH);
+        return geometry;
+    }
+
     private void DrawChassis(List<MouseButtonDefinition> buttons)
     {
-        // Ambient glow beneath the chassis.
-        var glow = new Ellipse
-        {
-            Width = _bodyW * 1.3,
-            Height = _bodyH * 0.5,
-            Fill = new RadialGradientBrush(Color.FromArgb(0x4A, Neon.R, Neon.G, Neon.B),
-                                           Color.FromArgb(0x00, Neon.R, Neon.G, Neon.B)),
-            Effect = new BlurEffect { Radius = 30 },
-            IsHitTestVisible = false
-        };
-        Place(glow, _bodyLeft + _bodyW / 2 - glow.Width / 2, _bodyTop + _bodyH * 0.62);
-
-        var body = new Path
-        {
-            Data = Geometry.Parse(
-                "M 0.50,0.02 " +
-                "C 0.72,0.02 0.90,0.14 0.93,0.34 " +
-                "C 0.96,0.52 0.92,0.70 0.84,0.85 " +
-                "C 0.76,0.97 0.62,1.00 0.50,1.00 " +
-                "C 0.38,1.00 0.24,0.97 0.16,0.85 " +
-                "C 0.08,0.70 0.04,0.52 0.07,0.34 " +
-                "C 0.10,0.14 0.28,0.02 0.50,0.02 Z"),
-            Width = _bodyW,
-            Height = _bodyH,
-            Stretch = Stretch.Fill,
-            Fill = new LinearGradientBrush
-            {
-                StartPoint = new Point(0.25, 0),
-                EndPoint = new Point(0.8, 1),
-                GradientStops =
-                {
-                    new GradientStop(Shell, 0),
-                    new GradientStop(Color.FromRgb(0x0A, 0x16, 0x11), 0.5),
-                    new GradientStop(ShellDeep, 1)
-                }
-            },
-            Stroke = new SolidColorBrush(Edge),
-            StrokeThickness = 1.6,
-            IsHitTestVisible = false
-        };
-        Place(body, _bodyLeft, _bodyTop);
-
-        // Primary pads: clicking the physical region selects that button.
-        var left = buttons.FirstOrDefault(b => b.RawButtonIndex == 1);
-        var right = buttons.FirstOrDefault(b => b.RawButtonIndex == 2);
-        var middle = buttons.FirstOrDefault(b => b.RawButtonIndex == 3);
-
-        AddPad(left, "M 0.47,0.03 C 0.29,0.04 0.11,0.16 0.08,0.34 C 0.07,0.38 0.065,0.41 0.065,0.45 L 0.47,0.45 Z");
-        AddPad(right, "M 0.53,0.03 C 0.71,0.04 0.89,0.16 0.92,0.34 C 0.93,0.38 0.935,0.41 0.935,0.45 L 0.53,0.45 Z");
-
-        // Scroll wheel well and wheel (middle button).
-        var well = new Rectangle
-        {
-            Width = _bodyW * 0.12,
-            Height = _bodyH * 0.20,
-            RadiusX = _bodyW * 0.06,
-            RadiusY = _bodyW * 0.06,
-            Fill = new SolidColorBrush(ShellDeep),
-            Stroke = new SolidColorBrush(Edge),
-            StrokeThickness = 1,
-            IsHitTestVisible = false
-        };
-        Place(well, _bodyLeft + _bodyW / 2 - well.Width / 2, _bodyTop + _bodyH * 0.10);
-
-        var wheelSelected = middle is not null && middle.Id == SelectedButtonId;
-        var wheel = new Rectangle
-        {
-            Width = _bodyW * 0.075,
-            Height = _bodyH * 0.155,
-            RadiusX = _bodyW * 0.04,
-            RadiusY = _bodyW * 0.04,
-            Fill = new LinearGradientBrush(wheelSelected ? NeonSoft : Neon,
-                                           Color.FromRgb(0x17, 0xA8, 0x68), 90),
-            Effect = new DropShadowEffect
-            {
-                Color = Neon,
-                BlurRadius = wheelSelected ? 22 : 12,
-                ShadowDepth = 0,
-                Opacity = wheelSelected ? 1 : 0.7
-            },
-            Cursor = Cursors.Hand,
-            Tag = middle?.Id
-        };
-        if (middle is not null)
-            wheel.MouseLeftButtonDown += OnRegionDown;
-        else
-            wheel.IsHitTestVisible = false;
-        Place(wheel, _bodyLeft + _bodyW / 2 - wheel.Width / 2, _bodyTop + _bodyH * 0.122);
-
-        // Side thumb-button plate (only drawn when the device reports extra buttons).
-        if (buttons.Any(b => b.RawButtonIndex is 4 or 5))
-        {
-            var plate = new Path
-            {
-                Data = Geometry.Parse("M 0.075,0.36 C 0.02,0.44 0.02,0.60 0.075,0.68"),
-                Width = _bodyW,
-                Height = _bodyH,
-                Stretch = Stretch.Fill,
-                Stroke = new SolidColorBrush(Neon),
-                StrokeThickness = 2.4,
-                Opacity = 0.4,
-                IsHitTestVisible = false
-            };
-            Place(plate, _bodyLeft, _bodyTop);
-        }
-
-        // Palm accent line, purely decorative.
-        var palm = new Path
-        {
-            Data = Geometry.Parse("M 0.30,0.74 C 0.42,0.80 0.58,0.80 0.70,0.74"),
-            Width = _bodyW,
-            Height = _bodyH,
-            Stretch = Stretch.Fill,
-            Stroke = new SolidColorBrush(Edge),
-            StrokeThickness = 1.4,
-            Opacity = 0.8,
-            IsHitTestVisible = false
-        };
-        Place(palm, _bodyLeft, _bodyTop);
+        var artwork = new MouseArtwork { Width = _bodyW, Height = _bodyH, AccentBrush = AccentBrush, SideView = SideView, IsHitTestVisible = false };
+        Place(artwork, _bodyLeft, _bodyTop);
+        if (SideView) return;
+        AddPad(buttons.FirstOrDefault(b => b.RawButtonIndex == 1), "M .12,.04 L .46,.04 L .46,.46 L .12,.46 Z");
+        AddPad(buttons.FirstOrDefault(b => b.RawButtonIndex == 2), "M .55,.04 L .89,.04 L .89,.46 L .55,.46 Z");
+        AddPad(buttons.FirstOrDefault(b => b.RawButtonIndex == 3), "M .47,.10 L .54,.10 L .54,.28 L .47,.28 Z");
     }
 
     private void AddPad(MouseButtonDefinition? button, string geometry)
@@ -265,15 +190,15 @@ public sealed class MouseLayoutCanvas : Canvas
         var selected = button is not null && button.Id == SelectedButtonId;
         var pad = new Path
         {
-            Data = Geometry.Parse(geometry),
+            Data = BodyGeometry(geometry),
             Width = _bodyW,
             Height = _bodyH,
-            Stretch = Stretch.Fill,
+            Stretch = Stretch.None,
             Fill = new SolidColorBrush(selected
-                ? Color.FromArgb(0x59, Neon.R, Neon.G, Neon.B)
-                : Color.FromArgb(0x14, Neon.R, Neon.G, Neon.B)),
-            Stroke = new SolidColorBrush(selected ? Neon : Edge),
-            StrokeThickness = selected ? 1.8 : 1,
+                ? Color.FromArgb(0x14, Neon.R, Neon.G, Neon.B)
+                : Color.FromArgb(0x00, Neon.R, Neon.G, Neon.B)),
+            Stroke = Brushes.Transparent,
+            StrokeThickness = 0,
             Cursor = Cursors.Hand,
             Tag = button?.Id
         };
@@ -286,8 +211,8 @@ public sealed class MouseLayoutCanvas : Canvas
             pad.MouseLeftButtonDown += OnRegionDown;
             pad.MouseEnter += (_, _) => pad.Fill = new SolidColorBrush(Color.FromArgb(0x38, Neon.R, Neon.G, Neon.B));
             pad.MouseLeave += (_, _) => pad.Fill = new SolidColorBrush(button.Id == SelectedButtonId
-                ? Color.FromArgb(0x59, Neon.R, Neon.G, Neon.B)
-                : Color.FromArgb(0x14, Neon.R, Neon.G, Neon.B));
+                ? Color.FromArgb(0x14, Neon.R, Neon.G, Neon.B)
+                : Colors.Transparent);
         }
         Place(pad, _bodyLeft, _bodyTop);
     }
@@ -297,12 +222,9 @@ public sealed class MouseLayoutCanvas : Canvas
     {
         var anchor = AnchorFor(button, pill);
         var selected = button.Id == SelectedButtonId;
-        var line = new Line
+        var line = new Polyline
         {
-            X1 = pill.X,
-            Y1 = pill.Y,
-            X2 = anchor.X,
-            Y2 = anchor.Y,
+            Points = new PointCollection { pill, new Point((pill.X + anchor.X) / 2, pill.Y), anchor },
             Stroke = new SolidColorBrush(selected ? Neon : Edge),
             StrokeThickness = selected ? 1.4 : 1,
             Opacity = selected ? 0.95 : 0.5,
@@ -322,6 +244,11 @@ public sealed class MouseLayoutCanvas : Canvas
 
     private Point AnchorFor(MouseButtonDefinition button, Point pill)
     {
+        if (SideView) return button.RawButtonIndex switch
+        {
+            1 => BodyPoint(.16, .62), 2 => BodyPoint(.27, .57), 3 => BodyPoint(.13, .60),
+            4 => BodyPoint(.36, .60), 5 => BodyPoint(.52, .59), _ => BodyPoint(.83, .76)
+        };
         switch (button.RawButtonIndex)
         {
             case 1: return BodyPoint(0.26, 0.22);
@@ -348,9 +275,9 @@ public sealed class MouseLayoutCanvas : Canvas
         var selected = button.Id == SelectedButtonId;
         var text = new TextBlock
         {
-            Text = ShortLabel(button),
-            Foreground = new SolidColorBrush(selected ? Ink : Label),
-            FontSize = 11,
+            Text = button.RawButtonIndex is 4 or 5 ? $"側鍵 {button.RawButtonIndex - 3} (Button {button.RawButtonIndex})" : ShortLabel(button),
+            Foreground = new SolidColorBrush(Label),
+            FontSize = 13,
             FontWeight = FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
@@ -359,19 +286,23 @@ public sealed class MouseLayoutCanvas : Canvas
 
         var border = new Border
         {
-            MinWidth = 62,
-            Height = 30,
+            Width = 158,
+            Height = 58,
             Padding = new Thickness(10, 0, 10, 0),
-            CornerRadius = new CornerRadius(4),
-            Background = new SolidColorBrush(selected ? Neon : Color.FromRgb(0x0A, 0x16, 0x11)),
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(selected ? ThemePalette.Mix(Neon, 12, .13) : ThemePalette.Mix(Neon, 22, .035)),
             BorderBrush = new SolidColorBrush(selected ? NeonSoft : Edge),
             BorderThickness = new Thickness(selected ? 1.8 : 1.2),
             Effect = selected
-                ? new DropShadowEffect { Color = Neon, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.9 }
+                ? new DropShadowEffect { Color = Neon, BlurRadius = 16, ShadowDepth = 0, Opacity = 0.35 }
                 : new DropShadowEffect { Color = Colors.Black, BlurRadius = 8, ShadowDepth = 2, Opacity = 0.5 },
             Cursor = EditMode ? Cursors.SizeAll : Cursors.Hand,
             Tag = button.Id,
-            Child = text,
+            Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children =
+            {
+                text,
+                new TextBlock { Text = ButtonLabels?.GetValueOrDefault(button.Id) ?? "預設按鍵", Foreground = new SolidColorBrush(selected ? Neon : Color.FromRgb(158,168,165)), FontSize = 11, Margin = new Thickness(0,6,0,0), MaxWidth = 132, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center }
+            } },
             ToolTip = button.DisplayName
         };
 
@@ -386,7 +317,7 @@ public sealed class MouseLayoutCanvas : Canvas
         border.MouseMove += OnNodeMove;
 
         border.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var width = Math.Max(border.MinWidth, border.DesiredSize.Width);
+        var width = border.Width;
         Place(border, cx - width / 2, cy - border.Height / 2);
     }
 
@@ -410,12 +341,13 @@ public sealed class MouseLayoutCanvas : Canvas
     {
         if (sender is not Border border || border.Tag is not string id)
             return;
+        if (EditMode)
+        {
+            _dragId = id;
+            _dragVisual = border;
+            border.CaptureMouse();
+        }
         ButtonClicked?.Invoke(id);
-        if (!EditMode)
-            return;
-        _dragId = id;
-        _dragVisual = border;
-        border.CaptureMouse();
         e.Handled = true;
     }
 
@@ -427,6 +359,7 @@ public sealed class MouseLayoutCanvas : Canvas
         CommitDrag();
         _dragVisual = null;
         _dragId = null;
+        Rebuild();
     }
 
     private void OnNodeMove(object sender, MouseEventArgs e)
@@ -453,10 +386,10 @@ public sealed class MouseLayoutCanvas : Canvas
     {
         if (button.RawButtonIndex == 1) return "左鍵";
         if (button.RawButtonIndex == 2) return "右鍵";
-        if (button.RawButtonIndex == 3) return "中鍵";
+        if (button.RawButtonIndex == 3) return "滾輪";
         var name = string.IsNullOrWhiteSpace(button.DisplayName) ? "按鍵" : button.DisplayName;
-        if (button.RawButtonIndex is >= 4 and <= 32 && name.StartsWith("按鍵", StringComparison.Ordinal))
-            return $"B{button.RawButtonIndex}";
+        if (button.RawButtonIndex is >= 4 and <= 32 && (name.StartsWith("按鍵", StringComparison.Ordinal) || name.StartsWith("Button", StringComparison.OrdinalIgnoreCase)))
+            return $"按鍵 {button.RawButtonIndex}";
         return name.Length > 7 ? name[..7] : name;
     }
 }

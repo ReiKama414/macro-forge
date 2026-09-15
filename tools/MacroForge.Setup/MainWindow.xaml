@@ -1,0 +1,189 @@
+<Window x:Class="MacroForge.Setup.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="MacroForge Setup"
+        Height="620" Width="760"
+        MinHeight="560" MinWidth="680"
+        WindowStyle="None"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize"
+        Icon="pack://application:,,,/Assets/app.ico"
+        Background="{StaticResource Bg}">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="46" ResizeBorderThickness="4"
+                        GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+  </shell:WindowChrome.WindowChrome>
+
+  <Border BorderBrush="{StaticResource Accent}" BorderThickness="1" CornerRadius="10" Background="{StaticResource Bg}">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="46"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Background="#071009" BorderBrush="#132A1E" BorderThickness="0,0,0,1" CornerRadius="9,9,0,0">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Left" Margin="18,0,0,0" VerticalAlignment="Center"
+                     FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"
+                     Text="MACROFORGE  ·  SETUP"/>
+          <Button DockPanel.Dock="Right" Content="✕" Style="{StaticResource ChromeButton}" Margin="0,0,8,0"
+                  shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="Close_Click"/>
+          <Button DockPanel.Dock="Right" Content="—" Style="{StaticResource ChromeButton}"
+                  shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="Minimize_Click"/>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Row="1" Margin="28,22,28,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="210"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Side rail -->
+        <Border Grid.Column="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Stroke}"
+                BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,18,0">
+          <StackPanel>
+            <TextBlock Text="INSTALL" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="Bold"/>
+            <TextBlock Text="MacroForge" FontSize="22" FontWeight="SemiBold" Margin="0,6,0,4"/>
+            <TextBlock Text="通用滑鼠巨集管理器" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap"/>
+
+            <StackPanel Margin="0,28,0,0">
+              <TextBlock x:Name="Step1Label" Text="① 歡迎" Margin="0,0,0,10" FontWeight="SemiBold"/>
+              <TextBlock x:Name="Step2Label" Text="② 聲明" Margin="0,0,0,10" Foreground="{StaticResource Muted}"/>
+              <TextBlock x:Name="Step3Label" Text="③ 位置" Margin="0,0,0,10" Foreground="{StaticResource Muted}"/>
+              <TextBlock x:Name="Step4Label" Text="④ 安裝" Margin="0,0,0,10" Foreground="{StaticResource Muted}"/>
+              <TextBlock x:Name="Step5Label" Text="⑤ 完成" Foreground="{StaticResource Muted}"/>
+            </StackPanel>
+
+            <StackPanel VerticalAlignment="Bottom" Margin="0,40,0,0">
+              <TextBlock Text="AUTHOR" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="Bold"/>
+              <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0">
+                <Hyperlink NavigateUri="https://github.com/ReiKama414/macro-forge"
+                           RequestNavigate="OnGitHubNavigate"
+                           Foreground="{StaticResource Accent}"
+                           TextDecorations="None"
+                           Cursor="Hand">reiKama414</Hyperlink>
+              </TextBlock>
+              <TextBlock FontSize="12" Margin="0,4,0,0">
+                <Hyperlink NavigateUri="https://github.com/ReiKama414/macro-forge"
+                           RequestNavigate="OnGitHubNavigate"
+                           Foreground="{StaticResource Muted}"
+                           TextDecorations="None"
+                           Cursor="Hand">github.com/ReiKama414/macro-forge</Hyperlink>
+              </TextBlock>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Pages -->
+        <Grid Grid.Column="1">
+          <!-- Welcome -->
+          <StackPanel x:Name="PageWelcome">
+            <TextBlock Text="歡迎安裝 MacroForge" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="22"
+                       Text="此安裝程式會把 MacroForge 放到你選擇的資料夾，並可建立捷徑。安裝前請先閱讀使用聲明。"/>
+            <Border Margin="0,22,0,0" Background="{StaticResource PanelAlt}" BorderBrush="{StaticResource Stroke}"
+                    BorderThickness="1" CornerRadius="6" Padding="16">
+              <StackPanel>
+                <TextBlock Text="版本資訊" Foreground="{StaticResource Accent}" FontSize="12" FontWeight="Bold"/>
+                <TextBlock Margin="0,8,0,0">
+                  <Run Text="作者："/>
+                  <Hyperlink NavigateUri="https://github.com/ReiKama414/macro-forge"
+                             RequestNavigate="OnGitHubNavigate"
+                             Foreground="{StaticResource Accent}"
+                             TextDecorations="None"
+                             Cursor="Hand">reiKama414</Hyperlink>
+                </TextBlock>
+                <TextBlock Margin="0,4,0,0" Text="產品：Universal Mouse Macro Manager"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{StaticResource Muted}" Text="需要：Windows 10/11 · .NET 8 Desktop Runtime"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Disclaimer -->
+          <StackPanel x:Name="PageDisclaimer" Visibility="Collapsed">
+            <TextBlock Text="使用聲明" FontSize="24" FontWeight="SemiBold"/>
+            <Border Margin="0,14,0,0" Background="{StaticResource PanelAlt}" BorderBrush="{StaticResource Stroke}"
+                    BorderThickness="1" CornerRadius="6" Padding="14" Height="280">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBlock TextWrapping="Wrap" LineHeight="22" FontSize="13">
+                  <Run Text="1. 本軟體以 Windows SendInput 模擬鍵盤／滑鼠輸入，僅供單機、文書或允許巨集的環境使用。"/><LineBreak/><LineBreak/>
+                  <Run Text="2. 請勿在啟用 BattleEye、EAC、VAC 或其他反作弊的線上遊戲中使用。可能違反遊戲服務條款並導致帳號處分。"/><LineBreak/><LineBreak/>
+                  <Run Text="3. 軟體以「現況」提供，作者 reiKama414 不保證相容性、穩定性或特定用途適用性，亦不對使用後果負責。"/><LineBreak/><LineBreak/>
+                  <Run Text="4. 本軟體為開源 MIT 授權。你可以自由使用、修改與再散布，但須保留著作權聲明。"/><LineBreak/><LineBreak/>
+                  <Run Text="5. 未購買 Authenticode 簽章時，Windows SmartScreen 可能顯示警告。請優先以本專案原始碼自行建置，或以發行頁公布的 SHA256 核對下載檔。"/>
+                </TextBlock>
+              </ScrollViewer>
+            </Border>
+            <CheckBox x:Name="AgreeBox" Margin="0,16,0,0" Checked="Agree_Changed" Unchecked="Agree_Changed"
+                      Content="我已閱讀並同意上述聲明"/>
+          </StackPanel>
+
+          <!-- Path -->
+          <StackPanel x:Name="PagePath" Visibility="Collapsed">
+            <TextBlock Text="安裝位置" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,8,0,0" Foreground="{StaticResource Muted}" Text="預設安裝到使用者目錄，不需要系統管理員權限。"/>
+            <TextBlock Margin="0,18,0,6" Foreground="{StaticResource Muted}" FontSize="12" Text="資料夾"/>
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Content="瀏覽" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Click="Browse_Click"/>
+              <TextBox x:Name="PathBox" IsReadOnly="True"/>
+            </DockPanel>
+            <CheckBox x:Name="DesktopShortcutBox" Margin="0,18,0,0" IsChecked="True" Content="建立桌面捷徑"/>
+            <CheckBox x:Name="StartMenuBox" Margin="0,10,0,0" IsChecked="True" Content="加入開始功能表"/>
+            <CheckBox x:Name="LaunchAfterBox" Margin="0,10,0,0" IsChecked="True" Content="安裝完成後啟動"/>
+          </StackPanel>
+
+          <!-- Progress -->
+          <StackPanel x:Name="PageProgress" Visibility="Collapsed">
+            <TextBlock Text="正在安裝" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock x:Name="ProgressText" Margin="0,12,0,0" Foreground="{StaticResource Muted}" Text="準備中…"/>
+            <ProgressBar x:Name="ProgressBar" Margin="0,22,0,0" Minimum="0" Maximum="100" Value="0"/>
+          </StackPanel>
+
+          <!-- Done -->
+          <StackPanel x:Name="PageDone" Visibility="Collapsed">
+            <TextBlock Text="安裝完成" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
+                       Text="MacroForge 已就緒。首次啟動時巨集預設為未啟用，需手動開啟總開關。"/>
+            <Border Margin="0,22,0,0" Background="{StaticResource PanelAlt}" BorderBrush="{StaticResource Stroke}"
+                    BorderThickness="1" CornerRadius="6" Padding="16">
+              <StackPanel>
+                <TextBlock Text="作者" Foreground="{StaticResource Accent}" FontSize="12" FontWeight="Bold"/>
+                <TextBlock Margin="0,6,0,0" FontSize="18" FontWeight="SemiBold">
+                  <Hyperlink NavigateUri="https://github.com/ReiKama414/macro-forge"
+                             RequestNavigate="OnGitHubNavigate"
+                             Foreground="{StaticResource Accent}"
+                             TextDecorations="None"
+                             Cursor="Hand">reiKama414</Hyperlink>
+                </TextBlock>
+                <TextBlock Margin="0,8,0,0" FontSize="12">
+                  <Hyperlink NavigateUri="https://github.com/ReiKama414/macro-forge"
+                             RequestNavigate="OnGitHubNavigate"
+                             Foreground="{StaticResource Muted}"
+                             TextDecorations="None"
+                             Cursor="Hand">https://github.com/ReiKama414/macro-forge</Hyperlink>
+                </TextBlock>
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
+                           Text="若發行頁有附 SHA256SUMS.txt，可用來確認你下載的安裝檔未被竄改。"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Grid>
+
+      <Border Grid.Row="2" Background="#071009" BorderBrush="#132A1E" BorderThickness="0,1,0,0"
+              Padding="28,14" CornerRadius="0,0,9,9">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <Button x:Name="BackButton" Content="上一步" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Click="Back_Click"/>
+            <Button x:Name="NextButton" Content="下一步" Style="{StaticResource PrimaryButton}" Click="Next_Click"/>
+          </StackPanel>
+          <TextBlock x:Name="FooterHint" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="12"
+                     Text="作者 reiKama414 · MIT"/>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

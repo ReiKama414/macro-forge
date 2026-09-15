@@ -127,6 +127,73 @@ public class MacroSchedulerTests
         Assert.False(scheduler.IsRunning("skill"));
     }
 
+    [Fact]
+    public async Task Stop_interrupts_a_long_action_delay_immediately()
+    {
+        var sender = new FakeSender();
+        var fg = new FakeForeground();
+        using var scheduler = new MacroScheduler(sender, fg);
+        var binding = new ButtonBinding
+        {
+            Id = "long-delay",
+            Name = "long-delay",
+            Scope = new ScopeDefinition { Type = "global" },
+            IntervalMs = 10
+        };
+        var macro = new MacroDefinition
+        {
+            Id = "long-delay",
+            Name = "long-delay",
+            Actions =
+            {
+                new MacroAction { Type = "delay", DelayMs = 5000 },
+                new MacroAction { Type = "key", Keys = { "F" } }
+            }
+        };
+
+        scheduler.Start(binding, macro, "once");
+        await Task.Delay(80);
+        scheduler.Stop(binding.Id);
+        await Task.Delay(120);
+
+        Assert.False(scheduler.IsRunning(binding.Id));
+        Assert.Empty(sender.Keys);
+    }
+
+    [Fact]
+    public async Task Manual_start_buffers_input_and_stop_cancels_pending_start()
+    {
+        var sender = new FakeSender();
+        var fg = new FakeForeground { Current = new ForegroundApp { ProcessName = "game.exe" } };
+        using var scheduler = new MacroScheduler(sender, fg);
+        var binding = new ButtonBinding { Id = "buffer", Scope = new ScopeDefinition { Type = "global" } };
+        var macro = new MacroDefinition { Actions = { new MacroAction { Type = "key", Keys = { "F" } } } };
+        scheduler.Start(binding, macro, "once", startupDelayMs: 250);
+        await Task.Delay(80);
+        Assert.Empty(sender.Keys);
+        scheduler.EmergencyStop();
+        await Task.Delay(280);
+        Assert.Empty(sender.Keys);
+        scheduler.Start(binding, macro, "once", startupDelayMs: 100);
+        await Task.Delay(250);
+        Assert.Single(sender.Keys);
+    }
+
+    [Fact]
+    public async Task Global_macro_waits_while_MacroForge_is_foreground()
+    {
+        var sender = new FakeSender();
+        var fg = new FakeForeground { Current = new ForegroundApp { ProcessName = "MacroForge.exe" } };
+        using var scheduler = new MacroScheduler(sender, fg);
+        Start(scheduler, "self-guard", "F", 20);
+        await Task.Delay(120);
+        Assert.Empty(sender.Keys);
+        Assert.Contains(scheduler.Snapshots, s => s.State == "waiting");
+        fg.Current = new ForegroundApp { ProcessName = "game.exe" };
+        await Task.Delay(150);
+        Assert.NotEmpty(sender.Keys);
+    }
+
     private static void Start(MacroScheduler scheduler, string id, string key, int interval, string? app = null)
     {
         var binding = new ButtonBinding

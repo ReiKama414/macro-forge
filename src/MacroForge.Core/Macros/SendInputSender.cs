@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using MacroForge.Core.Learning;
+using MacroForge.Core.Logging;
 using MacroForge.Core.Native;
 
 namespace MacroForge.Core.Macros;
@@ -20,8 +22,8 @@ public sealed class SendInputSender : IInputSender
             "middle" => (Win32.MOUSEEVENTF_MIDDLEDOWN, Win32.MOUSEEVENTF_MIDDLEUP),
             _ => (Win32.MOUSEEVENTF_LEFTDOWN, Win32.MOUSEEVENTF_LEFTUP)
         };
-        NativeMethods.SendInput(1, new[] { Mouse(down) }, Marshal.SizeOf<INPUT>());
-        NativeMethods.SendInput(1, new[] { Mouse(up) }, Marshal.SizeOf<INPUT>());
+        Emit(new[] { Mouse(down) });
+        Emit(new[] { Mouse(up) });
     }
 
     public void SendText(string text)
@@ -33,7 +35,7 @@ public sealed class SendInputSender : IInputSender
             inputs.Add(Uni(ch, up: true));
         }
         if (inputs.Count > 0)
-            NativeMethods.SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+            Emit(inputs.ToArray());
     }
 
     private static void Press(IReadOnlyList<string> keys, bool down)
@@ -57,7 +59,17 @@ public sealed class SendInputSender : IInputSender
             });
         }
         if (inputs.Count > 0)
-            NativeMethods.SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+            Emit(inputs.ToArray());
+    }
+
+    private static void Emit(INPUT[] inputs)
+    {
+        var sent = NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        if (sent == inputs.Length)
+            return;
+        var error = Marshal.GetLastWin32Error();
+        AppLogService.Instance.Error("輸入", $"SendInput 失敗：無法注入輸入 (錯誤碼：{error})");
+        Debug.WriteLine($"SendInput failed: sent={sent}/{inputs.Length} err={error}");
     }
 
     private static INPUT Mouse(uint flags) => new()

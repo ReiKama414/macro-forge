@@ -17,9 +17,14 @@ public class VirtualKeyNamesTests
     }
 
     [Fact]
-    public void Typed_digit_defaults_to_top_row()
+    public void Arrow_keys_use_glyphs()
     {
-        Assert.True(VirtualKeyNames.TryParse("1", out var vk));
-        Assert.Equal(0x31, vk);
+        Assert.Equal("←", VirtualKeyNames.CapGlyph("Left"));
+        Assert.Equal("↑", VirtualKeyNames.CapGlyph("Up"));
+        Assert.Equal("→", VirtualKeyNames.CapGlyph("Right"));
+        Assert.Equal("↓", VirtualKeyNames.CapGlyph("Down"));
+        Assert.Equal("← 左", VirtualKeyNames.DisplayName("Left"));
+        Assert.True(VirtualKeyNames.TryParse("Left", out var left));
+        Assert.Equal(0x25, left);
     }
 }

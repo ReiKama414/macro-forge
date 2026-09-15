@@ -79,6 +79,31 @@ public class ButtonLearningTests
         Assert.Empty(model.Buttons);
     }
 
+    [Fact]
+    public void Different_vendor_hid_reports_are_learned_as_distinct_buttons()
+    {
+        var model = new DeviceModel { DeviceId = "mouse_vendor" };
+        var learning = new ButtonLearningService();
+        learning.StartScanAll(model.DeviceId);
+
+        var first = learning.Observe(model, VendorReport(0x01), null);
+        var duplicate = learning.Observe(model, VendorReport(0x01), null);
+        var second = learning.Observe(model, VendorReport(0x02), null);
+
+        Assert.True(first.Added);
+        Assert.True(duplicate.Duplicate);
+        Assert.True(second.Added);
+        Assert.Equal(2, model.Buttons.Count);
+        Assert.NotEqual(model.Buttons[0].Signature, model.Buttons[1].Signature);
+    }
+
+    private static RawInputEvent VendorReport(byte value) => new()
+    {
+        Source = InputSource.UnknownHid,
+        IsDown = true,
+        HidReport = new byte[] { 0x07, value, 0x00 }
+    };
+
     private static RawInputEvent Down(int button) => new()
     {
         Source = InputSource.Mouse,

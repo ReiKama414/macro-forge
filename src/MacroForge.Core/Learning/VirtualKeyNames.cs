@@ -48,10 +48,10 @@ public static class VirtualKeyNames
             0x22 => "PageDown",
             0x23 => "End",
             0x24 => "Home",
-            0x25 => "方向左",
-            0x26 => "方向上",
-            0x27 => "方向右",
-            0x28 => "方向下",
+            0x25 => "← 左",
+            0x26 => "↑ 上",
+            0x27 => "→ 右",
+            0x28 => "↓ 下",
             0x2D => "Insert",
             0x2E => "Delete",
             0x5B => "左 Windows",
@@ -73,6 +73,57 @@ public static class VirtualKeyNames
             0xA6 => "Browser Back",
             _ => $"VK_0x{vk:X2}"
         };
+    }
+
+    /// <summary>Compact glyph for macro tiles (arrows, digits, F-keys).</summary>
+    public static string CapGlyph(string token)
+    {
+        var key = token.Trim();
+        if (key.Length == 0) return "·";
+        if (key.Length == 2 && key[0] == 'D' && char.IsDigit(key[1]))
+            return key[1].ToString();
+        if (key.StartsWith("NumPad", StringComparison.OrdinalIgnoreCase) && key.Length > 6)
+            return "Num " + key[6..];
+
+        if (TryParse(key, out var vk))
+        {
+            return vk switch
+            {
+                0x25 => "←",
+                0x26 => "↑",
+                0x27 => "→",
+                0x28 => "↓",
+                0x21 => "PgUp",
+                0x22 => "PgDn",
+                0x23 => "End",
+                0x24 => "Home",
+                0x20 => "␣",
+                0x0D => "↵",
+                0x08 => "⌫",
+                0x09 => "⇥",
+                0x1B => "Esc",
+                >= 0x70 and <= 0x87 => $"F{vk - 0x6F}",
+                >= 0x41 and <= 0x5A => ((char)vk).ToString(),
+                _ => DisplayFromVk(vk)
+            };
+        }
+
+        return key.ToUpperInvariant() switch
+        {
+            "LEFT" or "ARROWLEFT" or "方向左" => "←",
+            "UP" or "ARROWUP" or "方向上" => "↑",
+            "RIGHT" or "ARROWRIGHT" or "方向右" => "→",
+            "DOWN" or "ARROWDOWN" or "方向下" => "↓",
+            _ => key
+        };
+    }
+
+    public static string CapCombo(string? combo)
+    {
+        if (string.IsNullOrWhiteSpace(combo))
+            return "·";
+        var parts = combo.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(" + ", parts.Select(CapGlyph));
     }
 
     public static string CanonicalFromVk(int vk)
@@ -173,6 +224,16 @@ public static class VirtualKeyNames
             "TAB" => 0x09,
             "BACKSPACE" => 0x08,
             "BACK" => 0xA6,
+            "LEFT" or "ARROWLEFT" or "方向左" => 0x25,
+            "UP" or "ARROWUP" or "方向上" => 0x26,
+            "RIGHT" or "ARROWRIGHT" or "方向右" => 0x27,
+            "DOWN" or "ARROWDOWN" or "方向下" => 0x28,
+            "PAGEUP" or "PRIOR" => 0x21,
+            "PAGEDOWN" or "NEXT" => 0x22,
+            "HOME" => 0x24,
+            "END" => 0x23,
+            "INSERT" or "INS" => 0x2D,
+            "DELETE" or "DEL" => 0x2E,
             "NUMPADMULTIPLY" or "NUM*" => 0x6A,
             "NUMPADADD" or "NUM+" => 0x6B,
             "NUMPADSUBTRACT" or "NUM-" => 0x6D,

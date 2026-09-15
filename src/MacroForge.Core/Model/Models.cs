@@ -52,7 +52,7 @@ public sealed class MouseButtonDefinition
     public string InputSummary { get; set; } = "";
 
     public string Signature =>
-        $"{Source}|raw:{RawButtonIndex}|hid:{HidUsageId}|vk:{VirtualKey}|scan:{ScanCode}|con:{ConsumerUsage}";
+        $"{Source}|raw:{RawButtonIndex}|hid:{HidUsageId}|vk:{VirtualKey}|scan:{ScanCode}|con:{ConsumerUsage}|report:{HidReportHex ?? ""}";
 }
 
 public sealed class DeviceModel

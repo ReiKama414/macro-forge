@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Navigation;
 using MacroForge.Core;
 using MacroForge.Core.Input;
 
@@ -8,12 +10,16 @@ namespace MacroForge.App;
 
 public partial class MainWindow : Window
 {
+    public const string GitHubUrl = "https://github.com/ReiKama414/macro-forge";
+
     private readonly MainViewModel _vm;
 
-    public MainWindow()
+    public MainWindow() : this(new UniversalMouseService(), true) { }
+
+    public MainWindow(UniversalMouseService service, bool startRuntime)
     {
         InitializeComponent();
-        _vm = new MainViewModel(new UniversalMouseService());
+        _vm = new MainViewModel(service, persistTheme: startRuntime);
         DataContext = _vm;
         LayoutCanvas.ButtonClicked += id =>
         {
@@ -22,10 +28,19 @@ public partial class MainWindow : Window
                 _vm.SelectedButton = button;
         };
         LayoutCanvas.ButtonMoved += _vm.MoveButton;
-        Loaded += OnLoaded;
-        SourceInitialized += OnSourceInitialized;
+        if (startRuntime)
+        {
+            Loaded += OnLoaded;
+            SourceInitialized += OnSourceInitialized;
+        }
         PreviewKeyDown += OnPreviewKeyDown;
         Closing += OnClosing;
+    }
+
+    private void OnGitHubNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+        e.Handled = true;
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -77,7 +92,7 @@ public partial class MainWindow : Window
         var source = PresentationSource.FromVisual(this) as HwndSource;
         if (source is null)
             return;
-        WindowChromeHelper.ApplyRoundedCyberChrome(source.Handle);
+        WindowChromeHelper.ApplyRoundedCyberChrome(source.Handle, (System.Windows.Media.Color)FindResource("AccentColor"));
         RawInputRegistration.Register(source.Handle);
         source.AddHook(Hook);
     }

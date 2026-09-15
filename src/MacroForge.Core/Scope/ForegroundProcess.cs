@@ -7,6 +7,29 @@ namespace MacroForge.Core.Scope;
 
 public static class ForegroundProcess
 {
+    public static bool IsOwnApplication(ForegroundApp? app) => app is not null &&
+        (app.ProcessId == (uint)Environment.ProcessId ||
+         string.Equals(app.ExeFileName, "MacroForge.exe", StringComparison.OrdinalIgnoreCase));
+
+    public static async Task<ForegroundApp?> CaptureAfterSwitchAsync(Action<string> report, CancellationToken ct)
+    {
+        for (var seconds = 3; seconds > 0; seconds--)
+        {
+            report($"{seconds} 秒後擷取程式，請切換到目標視窗…");
+            await Task.Delay(1000, ct);
+        }
+        report("等待切換到目標視窗…");
+        for (var attempt = 0; attempt < 120; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var app = GetForegroundProcess();
+            if (app is not null && !IsOwnApplication(app)) return app;
+            await Task.Delay(250, ct);
+        }
+        report("未切換到其他程式，已取消擷取。");
+        return null;
+    }
+
     public static ForegroundApp? GetForegroundProcess()
     {
         var hwnd = NativeMethods.GetForegroundWindow();
@@ -67,7 +90,7 @@ public static class ForegroundProcess
         {
             try
             {
-                if (process.MainWindowHandle == IntPtr.Zero)
+                if (process.Id == Environment.ProcessId || process.MainWindowHandle == IntPtr.Zero)
                     continue;
                 var path = SafePath(process);
                 var name = string.IsNullOrWhiteSpace(path) ? process.ProcessName + ".exe" : Path.GetFileName(path);

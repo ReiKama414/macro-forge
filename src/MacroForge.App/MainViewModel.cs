@@ -1,12 +1,15 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MacroForge.Core;
 using MacroForge.Core.Devices;
 using MacroForge.Core.Learning;
+using MacroForge.Core.Logging;
 using MacroForge.Core.Macros;
 using MacroForge.Core.Model;
 using MacroForge.Core.Scope;
@@ -127,10 +130,12 @@ public sealed class MacroStep : INotifyPropertyChanged
             _value = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(KeyLabel));
+            OnPropertyChanged(nameof(KeyCap));
         }
     }
 
     public string KeyLabel => VirtualKeyNames.DisplayCombo(Value);
+    public string KeyCap => VirtualKeyNames.CapCombo(Value);
 
     private string _clickButton = "左鍵";
     public string ClickButton { get => _clickButton; set { _clickButton = value; OnPropertyChanged(); } }
@@ -150,7 +155,7 @@ public sealed class MacroStep : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-public sealed class MainViewModel : INotifyPropertyChanged
+public sealed partial class MainViewModel : INotifyPropertyChanged
 {
     public UniversalMouseService Service { get; }
     public ObservableCollection<ManagedMouse> Mice { get; } = new();
@@ -161,11 +166,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IReadOnlyList<string> FunctionOptions { get; } = new[] { "巨集", "鍵盤" };
     public IReadOnlyList<string> TriggerOptions { get; } = new[] { "單次執行", "按住循環", "切換循環", "固定次數", "定時執行" };
     public IReadOnlyList<string> LeaveOptions { get; } = new[] { "暫停", "停止", "忽略" };
+    public IReadOnlyList<string> AccentOptions { get; } = new[] { "綠", "青", "藍", "紫", "橘" };
 
     private readonly DispatcherTimer _jobTimer;
     private volatile bool _jobsDirty = true;
     private volatile bool _devicesDirty;
     private bool _shuttingDown;
+    private readonly bool _persistTheme;
 
     private ManagedMouse? _selected;
     public ManagedMouse? Selected
@@ -185,7 +192,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IdentityText));
             OnPropertyChanged(nameof(ProfileText));
             RefreshButtons();
-            LoadBindingEditor();
+            SelectedButton = Buttons.FirstOrDefault(b => b.Id == _selectedButton?.Id)
+                ?? Buttons.FirstOrDefault(b => b.RawButtonIndex == 4) ?? Buttons.FirstOrDefault();
+            NotifyPresentation();
         }
     }
 
@@ -201,6 +210,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(RenameText));
             OnPropertyChanged(nameof(HasSelectedButton));
             LoadBindingEditor();
+            NotifyPresentation();
         }
     }
 
@@ -212,8 +222,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             _page = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(IsMousePage));
-            OnPropertyChanged(nameof(IsAutoPage));
+            NotifyPageFlags();
         }
     }
     public bool IsMousePage => Page == "mouse";
@@ -241,12 +250,27 @@ public sealed class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ArmLabel));
             OnPropertyChanged(nameof(ArmHint));
             _jobsDirty = true;
+            AppLogService.Instance.Action("系統",
+                value ? "已開啟巨集總開關：滑鼠按鍵可觸發巨集" : "已關閉巨集總開關：滑鼠按鍵不會觸發巨集");
         }
     }
     public string ArmLabel => Armed ? "已啟用" : "未啟用";
     public string ArmHint => Armed
         ? "滑鼠按鍵會觸發巨集"
         : "滑鼠按鍵不會觸發巨集";
+
+    private string _selectedAccent = "綠";
+    public string SelectedAccent
+    {
+        get => _selectedAccent;
+        set
+        {
+            if (_selectedAccent == value) return;
+            _selectedAccent = value;
+            ApplyAccent(value);
+            OnPropertyChanged();
+        }
+    }
 
     private string _toast = "";
     public string Toast { get => _toast; set { _toast = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasToast)); } }
@@ -291,14 +315,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string _bindingId = "";
     private string _functionType = "巨集";
-    public string FunctionType { get => _functionType; set { _functionType = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsMacroFunction)); } }
+    public string FunctionType { get => _functionType; set { _functionType = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsMacroFunction)); OnPropertyChanged(nameof(IsKeyboardFunction)); OnPropertyChanged(nameof(IsMouseFunction)); } }
     public bool IsMacroFunction => FunctionType == "巨集";
 
     private string _triggerMode = "切換循環";
-    public string TriggerMode { get => _triggerMode; set { _triggerMode = value; OnPropertyChanged(); } }
+    public string TriggerMode { get => _triggerMode; set { _triggerMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsCountTrigger)); } }
 
     private string _intervalText = "1 s";
-    public string IntervalText { get => _intervalText; set { _intervalText = value; OnPropertyChanged(); } }
+    public string IntervalText { get => _intervalText; set { _intervalText = value; OnPropertyChanged(); OnPropertyChanged(nameof(IntervalValue)); OnPropertyChanged(nameof(IntervalUnit)); } }
 
     private string _repeatCountText = "1";
     public string RepeatCountText { get => _repeatCountText; set { _repeatCountText = value; OnPropertyChanged(); } }
@@ -378,6 +402,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand StopJobCommand { get; }
     public ICommand PauseJobCommand { get; }
     public ICommand ResumeJobCommand { get; }
+    public ICommand DeleteJobCommand { get; }
     public ICommand StartAllCommand { get; }
     public ICommand StartJobCommand { get; }
     public ICommand StopAllCommand { get; }
@@ -389,9 +414,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand RecordKeyCommand { get; }
     public ICommand RecordKeyboardCommand { get; }
 
-    public MainViewModel(UniversalMouseService service)
+    public MainViewModel(UniversalMouseService service, bool persistTheme = true)
     {
         Service = service;
+        _persistTheme = persistTheme;
+        LoadAccent();
+        InitLoggingCommands();
+        AttachLogService();
         _jobTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _jobTimer.Tick += (_, _) => OnTick();
 
@@ -404,6 +433,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Toast = ev.Message;
             Status = ev.Message;
             _devicesDirty = true;
+            AppLogService.Instance.Info("裝置", ev.Message);
         });
         service.NewDeviceFound += prompt => Post(() =>
         {
@@ -411,6 +441,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(PendingNew));
             OnPropertyChanged(nameof(HasPendingNew));
             Toast = $"發現新的滑鼠：{prompt.Physical.DisplayName}";
+            AppLogService.Instance.Info("裝置",
+                $"發現新的滑鼠：{prompt.Physical.DisplayName}（VID:{prompt.Physical.Fingerprint.Vid:X4} PID:{prompt.Physical.Fingerprint.Pid:X4}）");
         });
         service.LearningUpdated += result => Post(() =>
         {
@@ -418,6 +450,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsLearning));
             OnPropertyChanged(nameof(LearningTitle));
             _devicesDirty = true;
+            AppLogService.Instance.Action("按鍵", result.Message);
         });
         service.Status += text => Post(() => Status = text);
 
@@ -466,11 +499,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         DismissToastCommand = new RelayCommand(_ => Toast = "");
         SaveBindingCommand = new RelayCommand(_ => SaveBinding());
         PickAppCommand = new RelayCommand(_ => PickApp());
-        UseForegroundAppCommand = new RelayCommand(_ =>
+        UseForegroundAppCommand = new RelayCommand(async _ =>
         {
-            var app = ForegroundProcess.GetForegroundProcess();
+            var app = await CaptureTargetAsync();
             if (app is null) return;
-            AddApp(app.ExeFileName);
+            Status = $"已選擇：{app.ExeFileName}";
+            AddApp(MatchPath && !string.IsNullOrWhiteSpace(app.ExecutablePath)
+                ? app.ExecutablePath
+                : app.ExeFileName);
         });
         ClearAppsCommand = new RelayCommand(_ =>
         {
@@ -479,8 +515,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         });
         EmergencyStopCommand = new RelayCommand(_ =>
         {
+            _captureCancellation?.Cancel();
             Service.Macros.Scheduler.EmergencyStop();
             Status = "緊急停止：全部巨集已取消";
+            AppLogService.Instance.Warning("自動化", "緊急停止：全部巨集已取消 (F12)");
         });
         StopJobCommand = new RelayCommand(p =>
         {
@@ -496,6 +534,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (p is string id)
                 Service.Macros.Scheduler.Resume(id);
+        });
+        DeleteJobCommand = new RelayCommand(p =>
+        {
+            if (p is not string id) return;
+            Service.RemoveBinding(id);
+            Status = "已刪除自動化";
+            _jobsDirty = true;
         });
         StopAllCommand = new RelayCommand(_ => Service.Macros.Scheduler.StopAll());
         StartAllCommand = new RelayCommand(_ => StartAllBindings());
@@ -544,13 +589,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _jobTimer.Start();
         Reload();
         Status = $"已掃描 {Mice.Count(m => m.IsConnected)} 隻滑鼠 · 目前未啟用 · F12 全部停止";
+        AppLogService.Instance.Info("系統", "應用程式啟動完成 (MacroForge v0.1.0)");
+        AppLogService.Instance.Version("更新", "目前版本：v0.1.0");
+        foreach (var mouse in Mice.Where(m => m.IsConnected))
+        {
+            AppLogService.Instance.Info("裝置",
+                $"偵測到滑鼠：{mouse.DisplayName} (VID:{mouse.Snapshot.Device.Vid} PID:{mouse.Snapshot.Device.Pid})");
+            AppLogService.Instance.Info("裝置",
+                $"已載入滑鼠設定檔：{mouse.DisplayName}（{mouse.ButtonCount} 個按鍵）");
+        }
     }
 
     public void Shutdown()
     {
+        _captureCancellation?.Cancel();
         _shuttingDown = true;
         _jobTimer.Stop();
         Service.StopRuntime();
+        AppLogService.Instance.Info("系統", "應用程式關閉");
     }
 
     private void Post(Action action)
@@ -579,6 +635,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshJobs();
     }
 
+    private void LoadAccent()
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MacroForge",
+                "accent.txt");
+            if (File.Exists(path))
+                _selectedAccent = File.ReadAllText(path).Trim();
+        }
+        catch
+        {
+            _selectedAccent = "綠";
+        }
+        ApplyAccent(_selectedAccent, save: false);
+    }
+
+    private void ApplyAccent(string name, bool save = true)
+    {
+        if (Application.Current?.Resources is { } resources)
+            ThemePalette.Apply(resources, name);
+
+        if (!save || !_persistTheme) return;
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MacroForge");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "accent.txt"), name);
+        }
+        catch
+        {
+            // Theme persistence is optional.
+        }
+    }
+
     public void Reload()
     {
         var selectedId = Selected?.DeviceId ?? Service.Selected?.DeviceId;
@@ -590,8 +684,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // Selected may be the same instance, which short-circuits its setter, so
         // refresh the button list explicitly (learning adds buttons in place).
         RefreshButtons();
-        if (buttonId is not null)
-            SelectedButton = Buttons.FirstOrDefault(b => b.Id == buttonId);
+        SelectedButton = Buttons.FirstOrDefault(b => b.Id == buttonId) ?? Buttons.FirstOrDefault(b => b.RawButtonIndex == 4) ?? Buttons.FirstOrDefault();
         OnPropertyChanged(nameof(HasPendingNew));
         OnPropertyChanged(nameof(IsLearning));
         OnPropertyChanged(nameof(LearningTitle));
@@ -631,12 +724,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (Selected is null || SelectedButton is null)
             return;
+        BindingEnabled = true;
         BindingName = SelectedButton.DisplayName;
         var binding = Selected.Snapshot.Bindings.Bindings
             .LastOrDefault(b => BindingResolver.ButtonMatches(b.TargetButton, SelectedButton));
         if (binding is null)
         {
             _bindingId = "";
+            _chosenMacro = null;
+            OnPropertyChanged(nameof(ChosenMacro));
             FunctionType = "巨集";
             TriggerMode = "切換循環";
             IntervalText = "1 s";
@@ -651,8 +747,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         _bindingId = binding.Id;
+        BindingEnabled = binding.Enabled;
+        MouseAction = binding.Action.MouseButton switch { "right" => "右鍵", "middle" => "中鍵", _ => "左鍵" };
         BindingName = string.IsNullOrWhiteSpace(binding.Name) ? SelectedButton.DisplayName : binding.Name;
-        FunctionType = string.Equals(binding.Action.Type, "keyboard", StringComparison.OrdinalIgnoreCase) ? "鍵盤" : "巨集";
+        FunctionType = binding.Action.Type switch { "keyboard" => "鍵盤", "mouse" => "滑鼠", _ => "巨集" };
         TriggerMode = binding.Trigger switch
         {
             "once" => "單次執行",
@@ -676,13 +774,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Applications.Add(app);
         var macro = BindingResolver.ToMacro(binding, Selected.Snapshot.Bindings);
         KeyboardKeys = string.Join(" + ", binding.Action.Keys.Count > 0 ? binding.Action.Keys : (string.IsNullOrWhiteSpace(binding.Action.Key) ? Array.Empty<string>() : new[] { binding.Action.Key }));
+        _chosenMacro = Selected.Snapshot.Bindings.Macros.FirstOrDefault(m => m.Id == binding.Action.MacroId);
+        OnPropertyChanged(nameof(ChosenMacro));
         LoadSteps(macro.Actions);
         OnPropertyChanged(nameof(AppsLabel));
     }
 
-    private void SaveBinding()
+    private bool SaveBinding()
     {
-        if (Selected is null || SelectedButton is null) return;
+        if (Selected is null || SelectedButton is null) return false;
+        if (FunctionType == "預設")
+        {
+            foreach (var existing in Selected.Snapshot.Bindings.Bindings.Where(b => BindingResolver.ButtonMatches(b.TargetButton, SelectedButton)).ToList())
+                Service.RemoveBinding(existing.Id);
+            _bindingId = "";
+            RefreshJobs();
+            Status = "已恢復原本按鍵行為";
+            AppLogService.Instance.Action("按鍵", $"已恢復預設按鍵：{SelectedButton.DisplayName}");
+            return false;
+        }
+        if (FunctionType == "停用")
+        {
+            foreach (var existing in Selected.Snapshot.Bindings.Bindings.Where(b => BindingResolver.ButtonMatches(b.TargetButton, SelectedButton)).ToList())
+            {
+                existing.Enabled = false;
+                Service.Macros.Scheduler.Stop(existing.Id);
+                Service.UpsertBinding(existing);
+            }
+            BindingEnabled = false;
+            RefreshJobs();
+            Status = "已停用此按鍵的巨集；原生滑鼠輸入仍然有效";
+            AppLogService.Instance.Action("按鍵", $"已停用巨集：{SelectedButton.DisplayName}");
+            return false;
+        }
         var trigger = TriggerMode switch
         {
             "單次執行" => "once",
@@ -700,11 +824,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var keys = KeyboardKeys.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var actions = FunctionType == "鍵盤"
             ? new List<MacroAction> { new() { Type = "key", Keys = keys.ToList() } }
-            : StepsToActions();
-        if (actions.Count == 0)
+            : FunctionType == "滑鼠" ? new List<MacroAction> { new() { Type = "mouse", MouseButton = MouseAction switch { "右鍵" => "right", "中鍵" => "middle", _ => "left" } } } : StepsToActions();
+        if (actions.Count == 0 || (FunctionType == "鍵盤" && keys.Length == 0))
         {
             Status = "尚無動作，請先新增一個動作再儲存。";
-            return;
+            return false;
         }
 
         var macro = new MacroDefinition
@@ -731,20 +855,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
             },
             Action = new BindingAction
             {
-                Type = FunctionType == "鍵盤" ? "keyboard" : "macro",
+                Type = FunctionType == "鍵盤" ? "keyboard" : FunctionType == "滑鼠" ? "mouse" : "macro",
+                MouseButton = FunctionType == "滑鼠" ? actions[0].MouseButton : null,
                 Keys = keys.ToList(),
                 MacroId = macro.Id
             },
-            Macro = macro
+            Macro = macro,
+            Enabled = BindingEnabled
         };
         _bindingId = binding.Id;
         var macros = Selected.Snapshot.Bindings.Macros;
         macros.RemoveAll(m => m.Id == macro.Id);
         macros.Add(macro);
+        _chosenMacro = macro;
+        OnPropertyChanged(nameof(ChosenMacro));
         Service.UpsertBinding(binding);
         RefreshJobs();
-        Page = "auto";
-        Status = $"已儲存「{binding.Name}」· 到自動化頁按「開始」";
+        Status = $"已儲存「{binding.Name}」· 設定已套用";
+        AppLogService.Instance.Action("按鍵",
+            $"{(binding.Enabled ? "啟用" : "停用")}按鍵映射：{SelectedButton.DisplayName} -> {binding.Name}");
+        return true;
     }
 
     public void BeginRecord(MacroStep step)
@@ -869,6 +999,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return actions;
     }
 
+    private CancellationTokenSource? _captureCancellation;
+
+    private async Task<ForegroundApp?> CaptureTargetAsync()
+    {
+        _captureCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _captureCancellation = cancellation;
+        try
+        {
+            return await ForegroundProcess.CaptureAfterSwitchAsync(message => Status = message, cancellation.Token);
+        }
+        catch (OperationCanceledException) { return null; }
+        finally { if (ReferenceEquals(_captureCancellation, cancellation)) _captureCancellation = null; }
+    }
+
     private void PickApp()
     {
         var picker = new AppPickerWindow { Owner = Application.Current.MainWindow };
@@ -879,26 +1024,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void AddApp(string exe)
     {
         ScopeGlobal = false;
-        if (!Applications.Any(a => string.Equals(a, exe, StringComparison.OrdinalIgnoreCase)))
-            Applications.Add(exe);
+        var value = MatchPath ? exe : Path.GetFileName(exe);
+        if (!Applications.Any(a => string.Equals(a, value, StringComparison.OrdinalIgnoreCase)))
+            Applications.Add(value);
         OnPropertyChanged(nameof(AppsLabel));
     }
 
     private void StartAllBindings()
     {
         if (Selected is null) return;
-        var app = ForegroundProcess.GetForegroundProcess();
         foreach (var binding in Selected.Snapshot.Bindings.Bindings.Where(b => b.Enabled))
         {
-            if (!ScopeMatcher.Matches(binding.Scope, app) && !binding.Scope.IsGlobal)
-                continue;
             var macro = BindingResolver.ToMacro(binding, Selected.Snapshot.Bindings);
             if (macro.Actions.Count == 0) continue;
-            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger));
+            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger), startupDelayMs: 3000);
         }
         Page = "auto";
         RefreshJobs();
-        Status = "已開始全部巨集";
+        Status = "3 秒後開始，請切換到目標程式；F12 可取消。";
     }
 
     /// <summary>
@@ -912,9 +1055,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _ => "interval"
     };
 
-    private void AddProfileFromForeground()
+    private async void AddProfileFromForeground()
     {
-        var app = ForegroundProcess.GetForegroundProcess();
+        var app = await CaptureTargetAsync();
         if (app is null || Selected is null) return;
         Service.UpsertProfile(new ProfileDefinition
         {
@@ -941,9 +1084,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Status = "這個項目還沒有動作，請回滑鼠頁補上按鍵。";
                 return;
             }
-            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger));
+            Service.Macros.Scheduler.Start(binding, macro, ManualTrigger(binding.Trigger), startupDelayMs: 3000);
             Page = "auto";
-            Status = $"已開始：{binding.Name}";
+            Status = $"{binding.Name}：3 秒後開始，請切換到目標程式；F12 可取消。";
             RefreshJobs();
             return;
         }
@@ -996,8 +1139,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 row.IsLive = running is not null && running.State is "running" or "paused" or "waiting";
                 row.CanPause = running?.State is "running" or "waiting";
                 row.CanResume = running?.State == "paused";
-                row.CanStart = macro.Actions.Count > 0
-                    && (running is null || running.State is "paused" or "waiting");
+                row.CanStart = macro.Actions.Count > 0 && running is null;
                 order.Add(binding.Id);
             }
         }
@@ -1008,6 +1150,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Jobs.RemoveAt(i);
         }
 
+        NotifyPresentation();
         OnPropertyChanged(nameof(HasJobs));
         OnPropertyChanged(nameof(HasNoJobs));
         OnPropertyChanged(nameof(ProfileText));

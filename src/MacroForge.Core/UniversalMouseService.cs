@@ -2,6 +2,7 @@ using MacroForge.Core.Devices;
 using MacroForge.Core.Input;
 using MacroForge.Core.Layout;
 using MacroForge.Core.Learning;
+using MacroForge.Core.Logging;
 using MacroForge.Core.Macros;
 using MacroForge.Core.Model;
 using MacroForge.Core.Native;
@@ -67,6 +68,7 @@ public sealed class UniversalMouseService
     public ForegroundApp? Foreground { get; private set; }
 
     private CancellationTokenSource? _runtimeCts;
+    private string? _lastForegroundExe;
 
     /// <summary>
     /// Master switch. While false, physical mouse buttons never trigger macros —
@@ -89,6 +91,7 @@ public sealed class UniversalMouseService
         if (!enabled)
             Macros.Scheduler.StopAll();
         Status?.Invoke(enabled ? "已啟用：滑鼠按鍵可觸發巨集" : "已停用：滑鼠按鍵不會觸發巨集");
+        // Armed UI already logs; keep service path silent to avoid duplicates unless Status-only path used.
     }
 
     public void StartRuntime()
@@ -289,6 +292,10 @@ public sealed class UniversalMouseService
         var app = ForegroundProcess.GetForegroundProcess();
         ApplyProfile(managed, app);
         Macros.HandleButton(button, ev.IsDown, managed.Snapshot.Bindings, app);
+        // Wheel direction is a pulse, not a held button. Synthesize the release
+        // immediately so a "hold" binding cannot remain active forever.
+        if (ev.IsDown && ev.RawButtonIndex is >= 1001 and <= 1004)
+            Macros.HandleButton(button, false, managed.Snapshot.Bindings, app);
     }
 
     public void ApplyProfile(ManagedMouse mouse, ForegroundApp? app)
@@ -299,7 +306,10 @@ public sealed class UniversalMouseService
             return;
         mouse.Snapshot.Bindings.ActiveProfileId = id;
         if (profile is not null)
+        {
             Status?.Invoke($"已切換 Profile：{profile.Name}");
+            AppLogService.Instance.Info("應用程式", $"已切換設定檔：{profile.Name}");
+        }
     }
 
     public PhysicalMouseDevice? AttributeDevice(RawInputEvent ev)
@@ -333,9 +343,20 @@ public sealed class UniversalMouseService
     public void DeleteButton(string buttonId)
     {
         if (Selected is null) return;
+        var removed = Selected.Snapshot.Device.Buttons.FirstOrDefault(b => b.Id == buttonId);
+        if (removed is null) return;
+        var removedBindingIds = Selected.Snapshot.Bindings.Bindings
+            .Where(b => BindingResolver.ButtonMatches(b.TargetButton, removed))
+            .Select(b => b.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         Selected.Snapshot.Device.Buttons.RemoveAll(b => b.Id == buttonId);
         Selected.Snapshot.Layout.Buttons.RemoveAll(b => b.ButtonId == buttonId);
-        Selected.Snapshot.Bindings.Bindings.RemoveAll(b => string.Equals(b.TargetButton, buttonId, StringComparison.OrdinalIgnoreCase));
+        Selected.Snapshot.Bindings.Bindings.RemoveAll(b => removedBindingIds.Contains(b.Id));
+        Selected.Snapshot.Bindings.Macros.RemoveAll(m =>
+            removedBindingIds.Contains(m.Id) ||
+            Selected.Snapshot.Bindings.Bindings.All(b => b.Action.MacroId != m.Id));
+        foreach (var id in removedBindingIds)
+            Macros.Scheduler.Stop(id);
         SaveSelected();
         DevicesChanged?.Invoke();
     }
@@ -381,10 +402,19 @@ public sealed class UniversalMouseService
 
     public void RemoveBinding(string bindingId)
     {
-        if (Selected is null) return;
-        Selected.Snapshot.Bindings.Bindings.RemoveAll(b => b.Id == bindingId);
+        var owner = _mice.FirstOrDefault(m =>
+            m.Snapshot.Bindings.Bindings.Any(b => b.Id == bindingId));
+        if (owner is null) return;
+        var removed = owner.Snapshot.Bindings.Bindings.First(b => b.Id == bindingId);
+        owner.Snapshot.Bindings.Bindings.RemoveAll(b => b.Id == bindingId);
+        if (!string.IsNullOrWhiteSpace(removed.Action.MacroId) &&
+            owner.Snapshot.Bindings.Bindings.All(b => b.Action.MacroId != removed.Action.MacroId))
+            owner.Snapshot.Bindings.Macros.RemoveAll(m => m.Id == removed.Action.MacroId);
+        if (removed.Macro is not null &&
+            owner.Snapshot.Bindings.Bindings.All(b => b.Macro?.Id != removed.Macro.Id))
+            owner.Snapshot.Bindings.Macros.RemoveAll(m => m.Id == removed.Macro.Id);
         Macros.Scheduler.Stop(bindingId);
-        SaveSelected();
+        _store.Save(owner.Snapshot);
         DevicesChanged?.Invoke();
     }
 
@@ -422,6 +452,18 @@ public sealed class UniversalMouseService
             try
             {
                 Foreground = ForegroundProcess.GetForegroundProcess();
+                var exe = Foreground?.ExeFileName;
+                if (!string.IsNullOrWhiteSpace(exe) &&
+                    !string.Equals(exe, _lastForegroundExe, StringComparison.OrdinalIgnoreCase) &&
+                    !ForegroundProcess.IsOwnApplication(Foreground))
+                {
+                    if (!string.IsNullOrWhiteSpace(_lastForegroundExe))
+                    {
+                        AppLogService.Instance.Warning("應用程式",
+                            $"目前前景程式變更：{_lastForegroundExe} -> {exe}（部分應用程式巨集可能暫停）");
+                    }
+                    _lastForegroundExe = exe;
+                }
                 foreach (var mouse in _mice)
                     ApplyProfile(mouse, Foreground);
             }
@@ -504,6 +546,11 @@ public sealed class UniversalMouseService
             return button.VirtualKey == ev.VirtualKey;
         if (button.ConsumerUsage is not null)
             return button.ConsumerUsage == ev.ConsumerUsage;
+        if (!string.IsNullOrWhiteSpace(button.HidReportHex) && ev.HidReport is { Length: > 0 })
+            return string.Equals(
+                button.HidReportHex,
+                Convert.ToHexString(ev.HidReport),
+                StringComparison.OrdinalIgnoreCase);
         return false;
     }
 }

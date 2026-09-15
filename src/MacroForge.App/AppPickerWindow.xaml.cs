@@ -8,22 +8,43 @@ namespace MacroForge.App;
 
 public partial class AppPickerWindow : Window
 {
+    private readonly CancellationTokenSource _captureCancellation = new();
+    private bool _capturing;
     public string? SelectedExe { get; private set; }
 
     public AppPickerWindow()
     {
         InitializeComponent();
+        Closed += (_, _) => _captureCancellation.Cancel();
+        SourceInitialized += (_, _) =>
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            WindowChromeHelper.ApplyRoundedCyberChrome(handle,
+                (System.Windows.Media.Color)FindResource("AccentColor"));
+        };
         AppList.ItemsSource = ForegroundProcess.ListRunningApps();
     }
 
     private void AppList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => AcceptSelected();
 
-    private void UseForeground_Click(object sender, RoutedEventArgs e)
+    private async void UseForeground_Click(object sender, RoutedEventArgs e)
     {
-        var app = ForegroundProcess.GetForegroundProcess();
+        if (_capturing) return;
+        _capturing = true;
+        ForegroundApp? app;
+        var button = (System.Windows.Controls.Button)sender;
+        try
+        {
+            app = await ForegroundProcess.CaptureAfterSwitchAsync(message => button.Content = message, _captureCancellation.Token);
+        }
+        catch (OperationCanceledException) { return; }
+        finally { _capturing = false; }
+        if (_captureCancellation.IsCancellationRequested) return;
         if (app is null)
             return;
-        SelectedExe = app.ExeFileName;
+        SelectedExe = string.IsNullOrWhiteSpace(app.ExecutablePath)
+            ? app.ExeFileName
+            : app.ExecutablePath;
         DialogResult = true;
     }
 
@@ -47,7 +68,9 @@ public partial class AppPickerWindow : Window
     {
         if (AppList.SelectedItem is ForegroundApp app)
         {
-            SelectedExe = string.IsNullOrWhiteSpace(app.ExecutablePath) ? app.ProcessName : app.ExeFileName;
+            SelectedExe = string.IsNullOrWhiteSpace(app.ExecutablePath)
+                ? app.ExeFileName
+                : app.ExecutablePath;
             DialogResult = true;
         }
     }

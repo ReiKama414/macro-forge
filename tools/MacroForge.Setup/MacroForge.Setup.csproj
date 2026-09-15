@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>..\..\src\MacroForge.App\Assets\app.ico</ApplicationIcon>
+    <RootNamespace>MacroForge.Setup</RootNamespace>
+    <AssemblyName>MacroForge-Setup</AssemblyName>
+    <Product>MacroForge Setup</Product>
+    <Company>reiKama414</Company>
+    <Authors>reiKama414</Authors>
+    <Copyright>Copyright (c) 2026 reiKama414</Copyright>
+    <Version>1.0.0</Version>
+    <Description>MacroForge installer by reiKama414</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\src\MacroForge.App\Assets\app.ico" Link="Assets\app.ico" />
+  </ItemGroup>
+
+  <!-- Filled by scripts/publish-release.ps1 before building the installer. -->
+  <ItemGroup Condition="Exists('Payload\app.zip')">
+    <EmbeddedResource Include="Payload\app.zip" LogicalName="MacroForge.Setup.Payload.app.zip" />
+  </ItemGroup>
+
+</Project>

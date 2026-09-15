@@ -15,7 +15,7 @@ internal static class WindowChromeHelper
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
-    public static void ApplyRoundedCyberChrome(IntPtr hwnd)
+    public static void ApplyRoundedCyberChrome(IntPtr hwnd, System.Windows.Media.Color? accent = null)
     {
         if (hwnd == IntPtr.Zero)
             return;
@@ -23,8 +23,8 @@ internal static class WindowChromeHelper
         var corner = DWMWCP_ROUND;
         TrySet(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner);
 
-        // COLORREF is 0x00BBGGRR — neon green #2CE58B.
-        var border = 0x008BE52C;
+        var color = accent ?? System.Windows.Media.Color.FromRgb(53, 66, 61);
+        var border = color.R | color.G << 8 | color.B << 16;
         TrySet(hwnd, DWMWA_BORDER_COLOR, ref border);
     }
 
