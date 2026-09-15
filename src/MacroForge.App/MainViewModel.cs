@@ -431,6 +431,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ICommand PauseJobCommand { get; }
     public ICommand ResumeJobCommand { get; }
     public ICommand DeleteJobCommand { get; }
+    public ICommand EditJobCommand { get; }
     public ICommand StartAllCommand { get; }
     public ICommand StartJobCommand { get; }
     public ICommand StopAllCommand { get; }
@@ -573,6 +574,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             Service.RemoveBinding(id);
             Status = "已刪除自動化";
             _jobsDirty = true;
+        });
+        EditJobCommand = new RelayCommand(p =>
+        {
+            if (p is string id)
+                EditJob(id);
         });
         StopAllCommand = new RelayCommand(_ => Service.Macros.Scheduler.StopAll());
         StartAllCommand = new RelayCommand(_ => StartAllBindings());
@@ -1101,6 +1107,23 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             Page = "auto";
             Status = $"{binding.Name}：3 秒後開始，請切換到目標程式；F12 可取消。";
             RefreshJobs();
+            return;
+        }
+        Status = "找不到這個自動化項目。";
+    }
+
+    private void EditJob(string id)
+    {
+        foreach (var mouse in Service.Mice)
+        {
+            var binding = mouse.Snapshot.Bindings.Bindings.FirstOrDefault(b => b.Id == id);
+            if (binding is null)
+                continue;
+            Selected = Mice.FirstOrDefault(m => m.DeviceId == mouse.DeviceId) ?? mouse;
+            SelectedButton = Buttons.FirstOrDefault(b => BindingResolver.ButtonMatches(binding.TargetButton, b))
+                ?? Buttons.FirstOrDefault();
+            Page = "mouse";
+            Status = $"正在編輯「{binding.Name}」";
             return;
         }
         Status = "找不到這個自動化項目。";

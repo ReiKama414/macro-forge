@@ -41,6 +41,14 @@ public partial class MainWindow : Window
         }
         PreviewKeyDown += OnPreviewKeyDown;
         Closing += OnClosing;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MainViewModel.Page)
+                or nameof(MainViewModel.IsMousePage)
+                or nameof(MainViewModel.IsAutoPage)
+                or nameof(MainViewModel.IsLogPage))
+                HighlightPageNav();
+        };
     }
 
     public void RestoreFromTray()

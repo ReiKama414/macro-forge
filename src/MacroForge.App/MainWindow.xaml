@@ -178,7 +178,10 @@
                                   Visibility="{Binding IsLive, Converter={StaticResource BoolToVis}}"
                                   Command="{Binding DataContext.StopJobCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                   CommandParameter="{Binding Id}"/>
-                          <Button Content="刪除" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                          <Button Content="編輯" Style="{StaticResource GhostButton}" Margin="0,0,8,0"
+                                  Command="{Binding DataContext.EditJobCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  CommandParameter="{Binding Id}"/>
+                          <Button Content="刪除" Style="{StaticResource GhostButton}"
                                   Command="{Binding DataContext.DeleteJobCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                   CommandParameter="{Binding Id}"/>
                         </StackPanel>
@@ -299,7 +302,11 @@
          </DockPanel></Border>
          <UniformGrid Columns="3" Margin="0,0,-8,12"><RadioButton Content="◎  預設按鍵" GroupName="Function" Style="{StaticResource Tile}" IsChecked="{Binding FunctionType, Converter={StaticResource Choice}, ConverterParameter=預設}" /><RadioButton Content="⌨  鍵盤按鍵" GroupName="Function" Style="{StaticResource Tile}" IsChecked="{Binding FunctionType, Converter={StaticResource Choice}, ConverterParameter=鍵盤}" /><RadioButton Content="♧  滑鼠按鍵" GroupName="Function" Style="{StaticResource Tile}" IsChecked="{Binding FunctionType, Converter={StaticResource Choice}, ConverterParameter=滑鼠}" /><RadioButton Content="◇  巨集" GroupName="Function" Style="{StaticResource Tile}" IsChecked="{Binding FunctionType, Converter={StaticResource Choice}, ConverterParameter=巨集}" /><RadioButton Content="▣  開啟程式" Style="{StaticResource Tile}" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="目前巨集引擎尚未支援啟動程式"/><RadioButton Content="⊗  停用巨集" GroupName="Function" Style="{StaticResource Tile}" IsChecked="{Binding FunctionType, Converter={StaticResource Choice}, ConverterParameter=停用}" ToolTip="停用此按鍵的巨集，保留原生滑鼠輸入"/></UniformGrid>
          <StackPanel Visibility="{Binding IsKeyboardFunction, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12"><Label Content="鍵盤按鍵"/><DockPanel><Button DockPanel.Dock="Right" Content="錄製" Command="{Binding RecordKeyboardCommand}"/><TextBlock Text="{Binding KeyboardKeysLabel}" VerticalAlignment="Center" Foreground="{DynamicResource Accent}"/></DockPanel></StackPanel>
-         <ComboBox ItemsSource="{x:Static local:MacroStep.ClickOptions}" SelectedItem="{Binding MouseAction}" Visibility="{Binding IsMouseFunction, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12"/>
+         <UniformGrid Columns="3" Margin="0,0,-8,12" Visibility="{Binding IsMouseFunction, Converter={StaticResource BoolToVis}}">
+           <RadioButton Content="左鍵" GroupName="MouseAction" Style="{StaticResource Tile}" IsChecked="{Binding MouseAction, Converter={StaticResource Choice}, ConverterParameter=左鍵}"/>
+           <RadioButton Content="右鍵" GroupName="MouseAction" Style="{StaticResource Tile}" IsChecked="{Binding MouseAction, Converter={StaticResource Choice}, ConverterParameter=右鍵}"/>
+           <RadioButton Content="中鍵" GroupName="MouseAction" Style="{StaticResource Tile}" IsChecked="{Binding MouseAction, Converter={StaticResource Choice}, ConverterParameter=中鍵}"/>
+         </UniformGrid>
          <UniformGrid Columns="4" Margin="0,0,-8,10"><RadioButton Content="單次" GroupName="Trigger" Style="{StaticResource Tile}" IsChecked="{Binding TriggerMode, Converter={StaticResource Choice}, ConverterParameter=單次執行}" /><RadioButton Content="按住循環" GroupName="Trigger" Style="{StaticResource Tile}" IsChecked="{Binding TriggerMode, Converter={StaticResource Choice}, ConverterParameter=按住循環}" /><RadioButton Content="切換循環" GroupName="Trigger" Style="{StaticResource Tile}" IsChecked="{Binding TriggerMode, Converter={StaticResource Choice}, ConverterParameter=切換循環}" /><RadioButton Content="定時執行" GroupName="Trigger" Style="{StaticResource Tile}" IsChecked="{Binding TriggerMode, Converter={StaticResource Choice}, ConverterParameter=定時執行}" /></UniformGrid>
          <Grid Margin="0,2,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="118"/></Grid.ColumnDefinitions>
           <TextBlock Text="執行間隔" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox Grid.Column="1" Text="{Binding IntervalValue, UpdateSourceTrigger=LostFocus}" Padding="12,10" Margin="0,0,8,0"/><ComboBox Grid.Column="2" ItemsSource="{Binding IntervalUnits}" SelectedItem="{Binding IntervalUnit}"/>
@@ -356,11 +363,6 @@
         <Button Content="＋  滑鼠動作" Command="{Binding AddClickStepCommand}" Height="40"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
       </UniformGrid>
-      <Border DockPanel.Dock="Top" Background="{DynamicResource AccentSurface}" Padding="14,12"
-              Visibility="{Binding IsRecordingKey, Converter={StaticResource BoolToVis}}">
-        <TextBlock Text="{Binding RecordBanner}" Foreground="{DynamicResource Accent}" FontSize="13"
-                   TextWrapping="Wrap" LineHeight="20"/>
-      </Border>
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
                     Padding="16,16,12,8" VerticalAlignment="Center">
        <ItemsControl ItemsSource="{Binding MacroSteps}">
@@ -369,7 +371,7 @@
            <DataTemplate>
              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                <Border Width="118" Height="118" CornerRadius="10" BorderBrush="{DynamicResource ControlBorder}"
-                       BorderThickness="1" ClipToBounds="True" VerticalAlignment="Center">
+                       BorderThickness="1" VerticalAlignment="Center">
                  <Border.Style>
                    <Style TargetType="Border">
                      <Setter Property="Background" Value="{DynamicResource InputBg}"/>
@@ -403,10 +405,15 @@
                      <TextBlock Text="毫秒" FontSize="11" Foreground="{DynamicResource Muted}"
                                 HorizontalAlignment="Center" Margin="0,2,0,0"/>
                    </StackPanel>
-                   <ComboBox Grid.Row="0" ItemsSource="{x:Static local:MacroStep.ClickOptions}"
-                             SelectedItem="{Binding ClickButton}"
-                             Visibility="{Binding IsClick, Converter={StaticResource BoolToVis}}"
-                             Margin="10,16" VerticalAlignment="Center" MinHeight="36"/>
+                   <UniformGrid Grid.Row="0" Columns="3" Margin="6,10,6,4" VerticalAlignment="Center"
+                                Visibility="{Binding IsClick, Converter={StaticResource BoolToVis}}">
+                     <RadioButton Content="左" Style="{StaticResource Tile}" Padding="2,10" Margin="0,0,4,0" FontSize="12"
+                                  IsChecked="{Binding ClickButton, Converter={StaticResource Choice}, ConverterParameter=左鍵}" ToolTip="左鍵"/>
+                     <RadioButton Content="右" Style="{StaticResource Tile}" Padding="2,10" Margin="0,0,4,0" FontSize="12"
+                                  IsChecked="{Binding ClickButton, Converter={StaticResource Choice}, ConverterParameter=右鍵}" ToolTip="右鍵"/>
+                     <RadioButton Content="中" Style="{StaticResource Tile}" Padding="2,10" Margin="0" FontSize="12"
+                                  IsChecked="{Binding ClickButton, Converter={StaticResource Choice}, ConverterParameter=中鍵}" ToolTip="中鍵"/>
+                   </UniformGrid>
                    <Border Grid.Row="1" Background="#33000000" CornerRadius="0,0,9,9" Padding="10,0">
                      <DockPanel>
                        <Button DockPanel.Dock="Right" Style="{StaticResource BareButton}" Content="×"
@@ -486,13 +493,21 @@
         </Border>
       </Border>
 
-      <Border Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,10,26,0" Padding="14,10"
-              Background="{DynamicResource PanelAlt}" BorderBrush="{DynamicResource Accent}" BorderThickness="1" CornerRadius="4"
+      <Border Grid.Row="0" Grid.RowSpan="3" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+              Margin="0,0,0,88" Padding="22,14" CornerRadius="10" IsHitTestVisible="False"
+              Background="#CC0B1410" BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+              Visibility="{Binding IsRecordingKey, Converter={StaticResource BoolToVis}}">
+        <TextBlock Text="{Binding RecordBanner}" Foreground="{DynamicResource Accent}" FontSize="14"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="520"/>
+      </Border>
+
+      <Border Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,10,26,0" Padding="16,12"
+              Background="#CC0B1410" BorderBrush="{DynamicResource Accent}" BorderThickness="1" CornerRadius="8"
               Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}">
         <DockPanel>
           <Button DockPanel.Dock="Right" Content="✕" Style="{StaticResource ChromeButton}" Width="24" Height="20"
                   Command="{Binding DismissToastCommand}" Margin="12,0,0,0"/>
-          <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" FontSize="13"/>
+          <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" FontSize="13" TextWrapping="Wrap" MaxWidth="360"/>
         </DockPanel>
       </Border>
 

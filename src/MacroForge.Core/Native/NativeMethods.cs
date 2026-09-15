@@ -181,7 +181,7 @@ internal struct HIDP_VALUE_CAPS
 [StructLayout(LayoutKind.Sequential)]
 internal struct INPUT
 {
-    public int type;
+    public uint type;
     public INPUTUNION u;
 }
 
@@ -190,6 +190,7 @@ internal struct INPUTUNION
 {
     [FieldOffset(0)] public MOUSEINPUT mi;
     [FieldOffset(0)] public KEYBDINPUT ki;
+    [FieldOffset(0)] public HARDWAREINPUT hi;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -211,6 +212,14 @@ internal struct KEYBDINPUT
     public uint dwFlags;
     public uint time;
     public IntPtr dwExtraInfo;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct HARDWAREINPUT
+{
+    public uint uMsg;
+    public ushort wParamL;
+    public ushort wParamH;
 }
 
 internal sealed class SafeHidHandle : SafeHandleZeroOrMinusOneIsInvalid

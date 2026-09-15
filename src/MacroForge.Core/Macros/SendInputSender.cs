@@ -16,13 +16,16 @@ public sealed class SendInputSender : IInputSender
 
     public void SendMouseClick(string button)
     {
-        var (down, up) = button.ToLowerInvariant() switch
+        var (down, up) = (button ?? "").Trim().ToLowerInvariant() switch
         {
-            "right" => (Win32.MOUSEEVENTF_RIGHTDOWN, Win32.MOUSEEVENTF_RIGHTUP),
-            "middle" => (Win32.MOUSEEVENTF_MIDDLEDOWN, Win32.MOUSEEVENTF_MIDDLEUP),
+            "right" or "右鍵" => (Win32.MOUSEEVENTF_RIGHTDOWN, Win32.MOUSEEVENTF_RIGHTUP),
+            "middle" or "中鍵" or "滾輪" => (Win32.MOUSEEVENTF_MIDDLEDOWN, Win32.MOUSEEVENTF_MIDDLEUP),
             _ => (Win32.MOUSEEVENTF_LEFTDOWN, Win32.MOUSEEVENTF_LEFTUP)
         };
+        // Down and up in separate SendInput calls with a short gap; some games
+        // ignore a zero-duration click packed into a single batch.
         Emit(new[] { Mouse(down) });
+        Thread.Sleep(20);
         Emit(new[] { Mouse(up) });
     }
 
